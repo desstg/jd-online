@@ -600,8 +600,11 @@ async function testPan115() {
 }
 async function loadDirs() {
   var cur = _pickStack[_pickStack.length - 1];
+  // 用输入框里当前的 cookie，即使用户还没点「保存配置」也能拉目录
+  var cookie = document.getElementById('p115-cookie').value.trim();
   try {
-    var j = await jsonPost('/api/pan115/dirs', {cid: cur.cid});
+    var j = await jsonPost('/api/pan115/dirs', {cid: cur.cid, cookie: cookie});
+    if (!j.ok) { toast('加载目录失败：' + (j.error || '')); return; }
     var sel = document.getElementById('p115-dir-sel'); sel.innerHTML = '';
     (j.dirs || []).forEach(function (f) { var o = document.createElement('option'); o.value = f.cid; o.textContent = f.name; sel.appendChild(o); });
     var bc = _pickStack.map(function (x) { return x.name; }).join(' / ');
