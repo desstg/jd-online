@@ -1,0 +1,427 @@
+{% from "_macros.html" import icon %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}JD online{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}?v=19">
+</head>
+<body>
+  <div class="app-shell">
+    <nav class="navbar">
+      <div class="navbar-content">
+        <a class="brand" href="/"><span class="brand-logo"></span><span class="brand-name">JD&nbsp;<span class="brand-accent">online</span></span></a>
+        <div class="nav-links">
+          <a class="nav-item {{ 'active' if active == 'index' }}" href="/">{{ icon('home', 16) }}<span class="nav-label">首页</span></a>
+          <a class="nav-item {{ 'active' if active == 'top250' }}" href="/top250">{{ icon('star', 16) }}<span class="nav-label">榜单</span></a>
+          <a class="nav-item {{ 'active' if active == 'library' }}" href="/library">{{ icon('film', 16) }}<span class="nav-label">影库</span></a>
+          <a class="nav-item {{ 'active' if active == 'want' }}" href="/want">{{ icon('heart', 16) }}<span class="nav-label">订阅</span></a>
+          <a class="nav-item {{ 'active' if active == 'follow' }}" href="/follow">{{ icon('user', 16) }}<span class="nav-label">关注</span></a>
+          <a class="nav-item {{ 'active' if active == 'watched' }}" href="/watched">{{ icon('clock', 16) }}<span class="nav-label">看过</span></a>
+        </div>
+        <div class="nav-actions">
+          {% set cur_st = st|default('number') %}
+          <form class="jdb-search" action="/search" method="get">
+            <div class="jdb-search-main">
+              <div class="jdb-search-type" id="jdb-search-type">
+                <button type="button" class="jdb-search-type-btn" id="jdb-search-type-btn">
+                  <span class="jdb-type-icon">
+                    {% if cur_st == 'actor' %}{{ icon('user', 16) }}
+                    {% elif cur_st == 'series' %}{{ icon('folder', 16) }}
+                    {% elif cur_st == 'maker' %}{{ icon('server', 16) }}
+                    {% elif cur_st == 'director' %}{{ icon('film', 16) }}
+                    {% elif cur_st == 'label' %}{{ icon('star', 16) }}
+                    {% elif cur_st == 'all' %}{{ icon('list', 16) }}
+                    {% else %}{{ icon('hash', 16) }}{% endif %}
+                  </span>
+                  <span class="jdb-chevron">{{ icon('chevron-down', 14) }}</span>
+                </button>
+                <div class="jdb-search-menu">
+                  <button type="button" class="jdb-search-item {{ 'active' if cur_st == 'all' }}" data-st="all">{{ icon('list', 15) }}<span class="jdb-item-label">列表搜索</span><span class="jdb-item-check">{{ icon('check', 14) }}</span></button>
+                  <button type="button" class="jdb-search-item {{ 'active' if cur_st == 'number' }}" data-st="number">{{ icon('hash', 15) }}<span class="jdb-item-label">番号直达</span><span class="jdb-item-check">{{ icon('check', 14) }}</span></button>
+                  <button type="button" class="jdb-search-item {{ 'active' if cur_st == 'actor' }}" data-st="actor">{{ icon('user', 15) }}<span class="jdb-item-label">演员搜索</span><span class="jdb-item-check">{{ icon('check', 14) }}</span></button>
+                  <button type="button" class="jdb-search-item {{ 'active' if cur_st == 'series' }}" data-st="series">{{ icon('folder', 15) }}<span class="jdb-item-label">系列搜索</span><span class="jdb-item-check">{{ icon('check', 14) }}</span></button>
+                  <button type="button" class="jdb-search-item {{ 'active' if cur_st == 'maker' }}" data-st="maker">{{ icon('server', 15) }}<span class="jdb-item-label">片商搜索</span><span class="jdb-item-check">{{ icon('check', 14) }}</span></button>
+                  <button type="button" class="jdb-search-item {{ 'active' if cur_st == 'director' }}" data-st="director">{{ icon('film', 15) }}<span class="jdb-item-label">导演搜索</span><span class="jdb-item-check">{{ icon('check', 14) }}</span></button>
+                  <button type="button" class="jdb-search-item {{ 'active' if cur_st == 'label' }}" data-st="label">{{ icon('star', 15) }}<span class="jdb-item-label">清单搜索</span><span class="jdb-item-check">{{ icon('check', 14) }}</span></button>
+                </div>
+              </div>
+              <input type="text" name="q" id="jdb-search-input" placeholder="{% if cur_st == 'actor' %}搜索演员{% elif cur_st == 'series' %}搜索系列{% elif cur_st == 'maker' %}搜索片商{% elif cur_st == 'director' %}搜索导演{% elif cur_st == 'label' %}搜索清单{% elif cur_st == 'all' %}搜索影片{% else %}搜索影片番号{% endif %}" value="{{ q|default('') }}" autocomplete="off">
+            </div>
+            <input type="hidden" name="type" id="jdb-search-st" value="{{ cur_st }}">
+            <button class="jdb-search-submit" type="submit" title="搜索">{{ icon('search', 16) }}</button>
+          </form>
+          <button class="icon-btn" id="blur-toggle" title="模糊图片">
+            <span class="icon-eye">{{ icon('eye', 16) }}</span>
+            <span class="icon-eye-off">{{ icon('eye-off', 16) }}</span>
+          </button>
+          <div class="nav-more">
+            <button class="icon-btn {{ 'active' if active in ['settings','records'] else '' }}" id="nav-more-btn" title="更多">{{ icon('dots', 16) }}</button>
+            <div class="nav-menu" id="nav-menu">
+              <a class="nav-menu-item {{ 'active' if active == 'settings' }}" href="/settings">{{ icon('settings', 16) }} 设置</a>
+              <a class="nav-menu-item {{ 'active' if active == 'records' }}" href="/records">{{ icon('list', 16) }} 记录</a>
+              <a class="nav-menu-item" href="/logout">{{ icon('logout', 16) }} 退出登录</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- 移动端底部导航（≤768px 显示，玻璃磨砂底） -->
+    <nav class="mobile-bottom-nav">
+      <a class="nav-item {{ 'active' if active == 'index' }}" href="/">{{ icon('home', 16) }}<span class="nav-label">首页</span></a>
+      <a class="nav-item {{ 'active' if active == 'top250' }}" href="/top250">{{ icon('star', 16) }}<span class="nav-label">榜单</span></a>
+      <a class="nav-item {{ 'active' if active == 'library' }}" href="/library">{{ icon('film', 16) }}<span class="nav-label">影库</span></a>
+      <a class="nav-item {{ 'active' if active == 'want' }}" href="/want">{{ icon('heart', 16) }}<span class="nav-label">订阅</span></a>
+      <a class="nav-item {{ 'active' if active == 'follow' }}" href="/follow">{{ icon('user', 16) }}<span class="nav-label">关注</span></a>
+      <button type="button" class="nav-item mobile-me-btn {{ 'active' if active in ['settings','records'] else '' }}" id="mobile-me-btn" title="我的">{{ icon('user', 16) }}<span class="nav-label">我的</span></button>
+    </nav>
+
+    <!-- 移动端「我的」下拉：横排桌面「···」菜单项 + 返回，置于底部导航上方 -->
+    <div class="mobile-me-sheet" id="mobile-me-sheet">
+      <a class="mobile-me-item {{ 'active' if active == 'settings' }}" href="/settings">{{ icon('settings', 16) }}<span>设置</span></a>
+      <a class="mobile-me-item {{ 'active' if active == 'records' }}" href="/records">{{ icon('list', 16) }}<span>记录</span></a>
+      <button type="button" class="mobile-me-item" id="mobile-me-eye" title="模糊 / 清晰图片">{{ icon('eye', 16) }}<span class="mm-eyetext"><span class="mm-eyew">模</span>/<span class="mm-eyec">清</span></span></button>
+      <button type="button" class="mobile-me-item" id="mobile-me-back">{{ icon('x', 16) }}<span>返回</span></button>
+    </div>
+
+    <main class="main-content">
+      {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+      <div class="footer-brand">
+        <div style="font-weight:700"><span style="color:var(--accent)">JD</span> online</div>
+        <div class="brand-desc">JAVDB 媒体管理中心</div>
+      </div>
+      <div class="footer-meta">v1.0.0</div>
+    </footer>
+  </div>
+  <div id="toast" class="toast-tip" style="display:none"></div>
+
+  <div class="modal-overlay want-modal-overlay" id="want-sub-modal" hidden>
+    <div class="modal want-sub-modal" role="dialog" aria-modal="true" aria-labelledby="want-modal-title">
+      <div class="modal-header"><div><h2 id="want-modal-title">创建订阅</h2><p id="want-modal-target">设置下载条件</p></div><button class="icon-btn" type="button" data-want-modal-close>{{ icon('x', 16) }}</button></div>
+      <form id="want-sub-form">
+        <input type="hidden" name="id"><input type="hidden" name="target_id"><input type="hidden" name="target_key">
+        <div class="modal-body want-form-body">
+          <div class="form-row"><label>订阅类型</label><select name="target_type" class="glass-input"><option value="movie">影片订阅</option><option value="online">在线订阅</option><option value="actor">演员订阅</option><option value="list">清单订阅</option></select></div>
+          <div class="form-row"><label>名称</label><input name="target_name" class="glass-input" required placeholder="番号、演员或清单名称"></div>
+          <div class="form-row want-url-row" hidden><label>在线地址</label><input name="target_url" class="glass-input" placeholder="https://..."></div>
+
+          <fieldset class="want-fieldset"><legend>下载模式</legend><div class="want-choice-row">
+            <label class="want-choice"><input type="radio" name="download_mode" value="strict" checked><span>严格模式</span></label>
+            <label class="want-choice"><input type="radio" name="download_mode" value="upgrade"><span>洗版模式</span></label>
+            <label class="want-switch"><input type="checkbox" name="pre_download"><span>预下载</span></label>
+          </div><p class="form-help">严格模式要求所有条件满足；预下载会在未完全命中时先选当前相对高质量资源，之后可洗版。</p></fieldset>
+
+          <fieldset class="want-fieldset"><legend>质量</legend><div class="want-quality-row">
+            <label class="want-choice"><input type="checkbox" value="none" data-quality-none checked><span>无</span></label>
+            <label class="want-choice"><input type="checkbox" name="qualities" value="hd"><span>高清</span></label>
+            <label class="want-choice"><input type="checkbox" name="qualities" value="uhd"><span>超清</span></label>
+            <label class="want-choice"><input type="checkbox" name="qualities" value="subtitle"><span>字幕</span></label>
+            <label class="want-choice"><input type="checkbox" name="qualities" value="uncensored"><span>破解</span></label>
+          </div><p class="form-help">无 / 高清 / 超清 只能选一个；字幕、破解可叠加。</p></fieldset>
+
+          <div class="want-priority"><span>候选优先级</span><strong>高清</strong><i>→</i><strong>破解</strong><i>→</i><strong>文件大小</strong><small>越大越优先</small></div>
+
+          <fieldset class="want-fieldset"><legend>文件大小（MB）</legend><div class="want-range-row"><input type="number" name="min_size_mb" min="0" class="glass-input" placeholder="最小"><span>—</span><input type="number" name="max_size_mb" min="0" class="glass-input" placeholder="最大"></div></fieldset>
+          <fieldset class="want-fieldset"><legend>其他限制</legend><div class="want-grid-fields">
+            <label>最大文件数<input type="number" name="max_file_count" min="1" class="glass-input" placeholder="不限"></label>
+            <label>上映日期从<input type="date" name="release_date_from" class="glass-input"></label>
+            <label>上映日期至<input type="date" name="release_date_to" class="glass-input"></label>
+          </div></fieldset>
+
+          <fieldset class="want-fieldset want-actor-only" hidden><legend>超期设置</legend>
+            <label class="actor-expiry">超期天数 <span class="form-help-inline">只匹配发行日在最近 N 天内的影片</span><input type="number" name="expiry_days" min="0" class="glass-input" placeholder="0（不限）"></label>
+          </fieldset>
+
+          <fieldset class="want-fieldset want-actor-only" hidden>
+            <legend>类别过滤 <span class="cat-note">(注意! 这是与逻辑不是或逻辑)</span></legend>
+            <p class="form-help">包含类别（影片必须属于其中之一）：</p>
+            <div class="cat-dropdown" data-cat-dropdown data-cat-target="categories">
+              <button type="button" class="cat-dropdown-btn" name="categories_trigger"><span class="cat-dropdown-label">选择类别...</span>{{ icon('chevron-down', 16) }}</button>
+              <div class="cat-dropdown-menu">
+                <div class="cat-filter-top"><input type="text" class="glass-input cat-search" placeholder="搜索选项..." autocomplete="off"></div>
+                <div class="cat-list">{% for cat in categories %}<label class="cat-item"><input type="checkbox" name="categories" value="{{ cat }}"><span>{{ cat }}</span></label>{% endfor %}</div>
+              </div>
+            </div>
+            <p class="form-help">排除类别（影片属于这些类别时不订阅）：</p>
+            <div class="cat-dropdown" data-cat-dropdown data-cat-target="exclude_categories">
+              <button type="button" class="cat-dropdown-btn" name="exclude_categories_trigger"><span class="cat-dropdown-label">选择类别...</span>{{ icon('chevron-down', 16) }}</button>
+              <div class="cat-dropdown-menu">
+                <div class="cat-filter-top"><input type="text" class="glass-input cat-search" placeholder="搜索选项..." autocomplete="off"></div>
+                <div class="cat-list">{% for cat in categories %}<label class="cat-item"><input type="checkbox" name="exclude_categories" value="{{ cat }}"><span>{{ cat }}</span></label>{% endfor %}</div>
+              </div>
+            </div>
+          </fieldset>
+          <div class="form-error" id="want-form-error" hidden></div>
+        </div>
+        <div class="modal-footer"><button class="glass-button ghost" type="button" data-want-modal-close>取消</button><button class="glass-button" type="submit">保存</button></div>
+      </form>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+
+  <!-- 分享者弹窗（全局）：点击评论区分享用户名 / 关注页卡片打开，右上角可关注 -->
+  <div class="lightbox-overlay" id="sharer-modal" style="display:none;" onclick="if(event.target===this)closeSharerModal()">
+    <div class="sharer-modal-card" onclick="event.stopPropagation()">
+      <div class="sharer-modal-head">
+        <div class="sharer-modal-title-wrap">
+          <span class="sharer-title-icon">{{ icon('user', 16) }}</span>
+          <span id="sharer-modal-title">分享</span>
+        </div>
+        <div class="sharer-modal-head-actions">
+          <button class="sharer-follow-btn" type="button" id="sharer-follow-btn" style="display:none;">关注</button>
+          <button class="lightbox-close" onclick="closeSharerModal()" title="关闭">×</button>
+        </div>
+      </div>
+      <div class="sharer-modal-meta">
+        <span class="sharer-tag">用户ID <b id="sharer-modal-uid">—</b></span>
+        <span class="sharer-tag">已加载 <b id="sharer-modal-count">0</b> 部影片</span>
+      </div>
+      <div class="sharer-modal-body" id="sharer-modal-body"></div>
+      <div class="sharer-modal-foot">
+        <button class="sharer-close-btn" type="button" onclick="closeSharerModal()">{{ icon('x', 13) }} 关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dl-pick-menu" id="dl-pick-menu" style="display:none;"></div>
+
+  <script>
+  // 全局剪切板 + 推送（分享者弹窗在 base.html 全局化，关注页等也会用到）
+  function copyTextToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+    return new Promise(function (resolve, reject) {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(ta);
+      ok ? resolve() : reject(new Error('复制失败'));
+    });
+  }
+  // 下载器选择弹出菜单（贴近按钮的下拉选项，非弹窗）
+  var _dlPickMenu = document.getElementById('dl-pick-menu');
+  var _dlPickResolve = null;
+  function closeDlPick(val) {
+    if (_dlPickMenu) _dlPickMenu.style.display = 'none';
+    if (_dlPickResolve) { var r = _dlPickResolve; _dlPickResolve = null; r(val); }
+  }
+  function showDlPick(btn, options) {
+    var r = btn.getBoundingClientRect();
+    var optsHtml = options.map(function (o) {
+      return '<button type="button" class="nav-menu-item dl-pick-opt" data-name="' + o.name + '">' + o.name + '</button>';
+    }).join('');
+    _dlPickMenu.innerHTML = '<div class="dl-pick-title">推送到哪个下载器？</div>' + optsHtml;
+    _dlPickMenu.style.display = 'flex';
+    var mw = _dlPickMenu.offsetWidth, mh = _dlPickMenu.offsetHeight;
+    var left = r.left, top = r.bottom + 6;
+    if (left + mw > window.innerWidth - 8) left = window.innerWidth - mw - 8;
+    if (left < 8) left = 8;
+    if (top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 6);
+    _dlPickMenu.style.left = left + 'px';
+    _dlPickMenu.style.top = top + 'px';
+    _dlPickMenu.querySelectorAll('.dl-pick-opt').forEach(function (b) {
+      b.addEventListener('click', function (e) {
+        e.stopPropagation();
+        closeDlPick(b.getAttribute('data-name'));
+      });
+    });
+  }
+  async function pushMagnet(btn) {
+    var d = btn.dataset;
+    var body = {magnet: d.magnet || '', name: d.name || '', size: d.size || '', movie_id: d.movie || '', code: d.code || ''};
+    var opts;
+    try {
+      opts = ((await (await fetch('/api/downloaders/options')).json()).options) || [];
+    } catch (e) { toast('加载下载器失败：' + e); return false; }
+    if (!opts.length) { toast('没有可用的下载器：请先在设置里启用并配置'); return false; }
+    var name = await new Promise(function (resolve) {
+      _dlPickResolve = resolve;
+      showDlPick(btn, opts);
+    });
+    if (!name) return false;
+    body.downloader = name;
+    toast('正在推送…');
+    try {
+      var j = await (await fetch('/api/magnet/push', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})).json();
+      if (j.ok) { toast('推送成功：' + (j.msg || '已加入队列')); return true; }
+      toast('推送失败：' + (j.error || '未知错误')); return false;
+    } catch (err) { toast('推送失败：' + err); return false; }
+  }
+  if (_dlPickMenu) {
+    document.addEventListener('click', function (e) {
+      if (_dlPickMenu.style.display !== 'none' && !_dlPickMenu.contains(e.target)) closeDlPick(null);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && _dlPickMenu.style.display !== 'none') closeDlPick(null);
+    });
+  }
+  (function () {
+    var modal = document.getElementById('sharer-modal');
+    if (!modal) return;
+    var body = document.getElementById('sharer-modal-body');
+    var title = document.getElementById('sharer-modal-title');
+    var followBtn = document.getElementById('sharer-follow-btn');
+    var currentUserId = null;
+    var currentUsername = '';
+    var following = false;
+
+    function esc(v) {
+      var div = document.createElement('div');
+      div.textContent = v == null ? '' : String(v);
+      return div.innerHTML;
+    }
+    function imgproxy(u) { return u ? '/img?url=' + encodeURIComponent(u) + '&v=3' : ''; }
+    function bindCopy(btn) {
+      btn.addEventListener('click', function () {
+        copyTextToClipboard(btn.getAttribute('data-magnet')).then(function () {
+          toast('已复制链接');
+        }).catch(function () { toast('复制失败'); });
+      });
+    }
+    function setFollowing(state) {
+      following = !!state;
+      if (!followBtn) return;
+      followBtn.style.display = '';
+      followBtn.textContent = following ? '取消关注' : '关注';
+      followBtn.classList.toggle('following', following);
+    }
+    // 影片链接行徽章：HD / 字幕 / 破解 / 已推送
+    function linkBadges(l) {
+      var b = '';
+      if (l.pushed) b += '<span class="mg-badge done">已推送</span>';
+      if (l.has_hd) b += '<span class="mg-badge on">HD</span>';
+      if (l.has_cn) b += '<span class="mg-badge on">字幕</span>';
+      if (l.has_uc) b += '<span class="mg-badge break">破解</span>';
+      return b;
+    }
+    // 复制磁链按钮 + 推送按钮（复用全局 copyTextToClipboard）
+    function linkActions(l, movieId, code) {
+      var pushBody = 'data-magnet="' + esc(l.magnet) + '" data-name="' + esc(l.name) + '" data-size="' + esc(l.size) +
+        '" data-movie="' + esc(movieId) + '" data-code="' + esc(code) + '"';
+      return '<button type="button" class="si-copy" data-magnet="' + esc(l.magnet) + '" title="复制链接">复制</button>' +
+        (l.pushed
+          ? '<button type="button" class="si-push done" ' + pushBody + ' title="已推送" disabled>已推送</button>'
+          : '<button type="button" class="si-push" ' + pushBody + ' title="推送">推送</button>');
+    }
+    function render(data) {
+      var items = data.items || [];
+      document.getElementById('sharer-modal-uid').textContent = currentUserId || '—';
+      document.getElementById('sharer-modal-count').textContent = items.length;
+      if (!items.length) {
+        body.innerHTML = '<div class="sharer-empty">该用户在本地库中暂无分享记录。</div>';
+        return;
+      }
+      body.innerHTML = items.map(function (m) {
+        var img = m.poster_url
+          ? '<img src="' + imgproxy(m.poster_url) + '" loading="lazy" alt="' + esc(m.number) + '">'
+          : '<div class="placeholder">无封面</div>';
+        var libFlag = '<span class="poster-lib ' + (m.in_library ? '' : 'missing') + '">'
+          + (m.in_library ? '已入库' : '未入库') + '</span>';
+        var cover = '<a class="sc-poster" href="/movie/' + esc(m.movie_id) + '">' + img + libFlag + '</a>';
+        var rightArrow = '<span class="si-arrow">→</span>';
+        var rows = (m.links || []).map(function (l) {
+          return '<div class="si-row">' +
+            '<span class="si-link-kind">⚓</span>' +
+            '<span class="si-link-name" title="' + esc(l.name || l.magnet) + '">' + esc(l.name || l.magnet) + '</span>' +
+            '<span class="si-link-size">' + esc(l.size || '—') + '</span>' +
+            '<span class="si-tags">' + linkBadges(l) + '</span>' +
+            '<span class="si-actions">' + linkActions(l, m.movie_id, m.number) + '</span>' +
+            '</div>';
+        }).join('');
+        return '<div class="sharer-card">' +
+          '<div class="sc-info-row">' +
+          cover +
+          '<div class="sc-info">' +
+          '<a class="sc-num" href="/movie/' + esc(m.movie_id) + '">' + esc(m.number || m.movie_id) + '</a>' +
+          '<div class="sc-title" title="' + esc(m.title) + '">' + esc(m.title) + '</div>' +
+          '<div class="sc-date">' + esc(m.release_date || '') + '</div>' +
+          '</div>' +
+          '<a class="sc-goto" href="/movie/' + esc(m.movie_id) + '">' + rightArrow + '</a>' +
+          '</div>' +
+          '<div class="si-rows">' + rows + '</div>' +
+          '</div>';
+      }).join('');
+      body.querySelectorAll('.si-copy').forEach(bindCopy);
+      body.querySelectorAll('.si-push:not(.done)').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          var ok = await pushMagnet(btn);
+          if (ok) markRowPushed(btn);
+        });
+      });
+    }
+
+    // 推送成功后把磁链行标记为「已推送」（禁用按钮 + 显示已推送徽章）
+    function markRowPushed(btn) {
+      var row = btn.closest('.si-row');
+      if (!row) return;
+      var tags = row.querySelector('.si-tags');
+      if (tags && !tags.querySelector('.mg-badge.done')) {
+        tags.insertAdjacentHTML('afterbegin', '<span class="mg-badge done">已推送</span>');
+      }
+      btn.classList.add('done');
+      btn.textContent = '已推送';
+      btn.disabled = true;
+    }
+
+    window.openSharerModal = function (sharerId, sharerName) {
+      currentUserId = sharerId;
+      currentUsername = sharerName || '';
+      title.textContent = (sharerName || '该用户') + ' 提交的资源';
+      body.innerHTML = '<div class="sharer-empty">加载中…</div>';
+      if (followBtn) followBtn.style.display = 'none';
+      modal.style.display = 'flex';
+      fetch('/api/user/' + encodeURIComponent(sharerId) + '/shares')
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (!data || data.ok === false) throw new Error((data && (data.error || data.message)) || '加载失败');
+          setFollowing(data.following);
+          render(data);
+        })
+        .catch(function (err) { body.innerHTML = '<div class="sharer-empty">加载失败：' + esc(err.message) + '</div>'; });
+    };
+    window.closeSharerModal = function () { modal.style.display = 'none'; };
+
+    if (followBtn) {
+      followBtn.addEventListener('click', function () {
+        if (currentUserId == null) return;
+        var url = '/api/user/' + encodeURIComponent(currentUserId) + '/' + (following ? 'unfollow' : 'follow');
+        fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username: currentUsername})})
+          .then(function (r) { return r.json(); })
+          .then(function (j) {
+            if (j.ok) { setFollowing(j.following); toast((j.following ? '已关注' : '已取消关注') + ' ' + currentUsername); }
+            else { toast('操作失败：' + (j.error || '未知错误')); }
+          })
+          .catch(function (err) { toast('操作失败：' + err); });
+      });
+    }
+
+    // 事件委托：详情页评论区分享用户名、关注页卡片等任意位置的打开入口
+    document.addEventListener('click', function (e) {
+      var el = e.target && e.target.closest ? e.target.closest('.mg-sharer.link[data-sharer-id]') : null;
+      if (el) openSharerModal(el.getAttribute('data-sharer-id'), el.getAttribute('data-sharer'));
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && modal.style.display !== 'none') closeSharerModal();
+    });
+  })();
+  </script>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

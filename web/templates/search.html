@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, videocard %}
+{% block title %}{{ type_label }}：「{{ q }}」 · JD online{% endblock %}
+
+{% block content %}
+<div class="search-head">
+  <div class="search-title">{{ type_label }}：<span class="search-query">"{{ q }}"</span> <span class="rank-count">{{ count }}</span></div>
+  <button class="sub-btn" onclick="toast('已订阅')">{{ icon('heart', 15) }} 订阅</button>
+</div>
+
+<div class="search-filter">
+  <select class="filter-sel" onchange="goSearch()" name="filter" title="筛选">
+    <option value="all" {{ 'selected' if filter_ == 'all' }}>筛选 全部</option>
+    <option value="censored" {{ 'selected' if filter_ == 'censored' }}>有码</option>
+    <option value="uncensored" {{ 'selected' if filter_ == 'uncensored' }}>无码</option>
+    <option value="european" {{ 'selected' if filter_ == 'european' }}>欧美</option>
+    <option value="fc2" {{ 'selected' if filter_ == 'fc2' }}>FC2</option>
+  </select>
+
+  <select class="filter-sel" onchange="goSearch()" name="year" title="年份">
+    <option value="" {{ 'selected' if not year }}>年份 全部</option>
+    {% for y in range(2026, 1999, -1) %}
+    <option value="{{ y }}" {{ 'selected' if year == (y|string) }}>{{ y }}</option>
+    {% endfor %}
+  </select>
+
+  <select class="filter-sel" onchange="goSearch()" name="sort" title="排序">
+    <option value="release_date" {{ 'selected' if sort == 'release_date' }}>排序 上映日期</option>
+    <option value="score" {{ 'selected' if sort == 'score' }}>排序 评分</option>
+    <option value="relevance" {{ 'selected' if sort == 'relevance' }}>排序 相关度</option>
+  </select>
+</div>
+
+{% if error %}
+<div class="empty-card">
+  {{ icon('search', 28) }}
+  <p>搜索失败：{{ error }}</p>
+</div>
+{% elif movies %}
+<div class="video-grid">
+  {% for m in movies %}
+  {{ videocard(m, lib_codes) }}
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-card">
+  {{ icon('search', 28) }}
+  <p>没有找到「{{ q }}」的{{ type_label }}相关影片。</p>
+</div>
+{% endif %}
+
+{% if movies and total_pages and total_pages > 1 %}
+<div class="pagination">
+  {% set base = '/search?type=' ~ (request.args.get('type','all') | urlencode) ~ '&q=' ~ (q | urlencode) ~ '&filter=' ~ filter_ ~ '&year=' ~ year ~ '&sort=' ~ sort %}
+  {% if page > 1 %}<a class="page-btn" href="{{ base }}&page={{ page - 1 }}">← 上一页</a>{% else %}<span class="page-btn disabled">← 上一页</span>{% endif %}
+  <span class="page-info">第 {{ page }} / {{ total_pages }} 页</span>
+  {% if page < total_pages %}<a class="page-btn" href="{{ base }}&page={{ page + 1 }}">下一页 →</a>{% else %}<span class="page-btn disabled">下一页 →</span>{% endif %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function goSearch() {
+  var f = document.querySelector('.search-filter');
+  var filter = f.querySelector('[name=filter]').value;
+  var year = f.querySelector('[name=year]').value;
+  var sort = f.querySelector('[name=sort]').value;
+  var type = '{{ request.args.get("type", "all") }}';
+  var q = '{{ q | replace("'", "\\'") }}';
+  var url = '/search?type=' + encodeURIComponent(type) + '&q=' + encodeURIComponent(q) +
+            '&filter=' + encodeURIComponent(filter) + '&year=' + encodeURIComponent(year) +
+            '&sort=' + encodeURIComponent(sort);
+  window.location.href = url;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,25 @@
+# JD online — JAVDB 媒体管理中心
+# 运行数据（config.json + javdb.db）放在宿主机 ./data 目录，挂载到容器 /data。
+#
+# 两种初始化方式：
+#   1) 全新启动：./data 留空会自动生成默认 config.json（登录口令 123 / abc123）
+#      与空 javdb.db，之后在网页「设置」页填入凭据。
+#   2) 迁移现有数据：把旧的 config.json、javdb.db 复制进 ./data 即可。
+#
+# 如果容器以 appuser(uid 1000) 运行，宿主机 ./data 需可写：
+#   chown -R 1000:1000 ./data
+# 若嫌麻烦，可加 `user: "0:0"` 以 root 运行（不推荐）。
+services:
+  jd-online:
+    image: desstg/jd-online:latest
+    container_name: jd-online
+    restart: unless-stopped
+    ports:
+      - "9091:9091"
+    volumes:
+      - ./data:/data
+    environment:
+      - TZ=Asia/Shanghai
+      # 网页登录账号 / 密码（环境变量优先于 config.json 与默认值；注释掉则用默认 123 / abc123）
+      - JD_WEB_USERNAME=123
+      - JD_WEB_PASSWORD=abc123

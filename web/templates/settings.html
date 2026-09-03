@@ -1,0 +1,777 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}设置 · JD online{% endblock %}
+
+{%- macro placeholder(text) -%}
+<div class="empty-card">{{ icon('settings', 28) }}<p>{{ text }}</p></div>
+{%- endmacro -%}
+
+{% block content %}
+<style>
+  .cd2-panel .section-title svg { width:18px; height:18px; }
+  .cd2-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.1rem; }
+  .cd2-hot { background:rgba(0,191,165,0.12); color:var(--accent); }
+  .cd2-enable { font-weight:600; }
+  .cd2-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:1rem; margin-bottom:1rem; }
+  .cd2-field { display:flex; flex-direction:column; gap:0.35rem; margin-bottom:1rem; }
+  .cd2-field label { font-size:0.82rem; color:var(--text-secondary); font-weight:500; display:flex; align-items:center; gap:0.3rem; }
+  .cd2-field label span[title] { color:var(--text-muted); cursor:help; }
+  .cd2-var { font-family:var(--mono); font-size:0.8rem; color:var(--accent); background:rgba(0,191,165,0.08); border:1px solid rgba(0,191,165,0.25); border-radius:0.3rem; padding:0.08rem 0.38rem; white-space:nowrap; }
+  .cd2-var-hint { margin-bottom:0.4rem; }
+  .cd2-vars { line-height:1.9; color:var(--text-main); font-size:0.8rem; }
+  .cd2-test { display:flex; flex-direction:column; align-items:center; gap:0.4rem; margin:1.2rem 0; }
+  .cd2-test-btn { background:transparent; border:none; color:var(--accent); font-weight:600; font-size:0.9rem; display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer; padding:0.3rem 0.8rem; }
+  .cd2-test-btn:disabled { cursor:not-allowed; opacity:1; color:var(--text-muted); }
+  .cd2-test-icon svg { width:14px; height:14px; }
+  .cd2-test-msg { color:#f59e0b; font-size:0.78rem; }
+  .cd2-foot { display:flex; justify-content:flex-end; gap:0.6rem; margin-top:0.6rem; }
+  .cd2-foot .glass-button { border-radius:0.5rem; }
+  /* —— 订阅配置（18.png） —— */
+  #panel-sub .sub-block-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; }
+  #panel-sub .section-title svg { width:18px; height:18px; }
+  .sub-pill { border:1px solid var(--border); background:transparent; color:var(--text-muted); border-radius:999px; padding:0.35rem 1rem; font-size:0.82rem; font-weight:600; cursor:pointer; }
+  .sub-pill.pill-on { color:var(--accent); border-color:rgba(0,191,165,0.5); background:rgba(0,191,165,0.08); }
+  .sub-info { display:flex; align-items:center; gap:0.5rem; background:rgba(37,99,235,0.06); border:1px solid rgba(37,99,235,0.15); border-radius:0.5rem; padding:0.6rem 0.8rem; font-size:0.8rem; color:var(--text-secondary); margin-bottom:1.1rem; }
+  .sub-info svg { color:#3b82f6; width:14px; height:14px; flex-shrink:0; }
+  .sub-time-label { font-size:0.82rem; color:var(--text-secondary); font-weight:500; display:flex; align-items:center; gap:0.3rem; margin-bottom:0.5rem; }
+  .sub-q { color:var(--text-muted); cursor:help; font-size:0.72rem; }
+  .sub-time-row { display:flex; flex-wrap:wrap; align-items:center; gap:0.6rem; margin-bottom:1.1rem; }
+  .sub-time-chips { display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center; }
+  .sub-time-chip { display:inline-flex; align-items:center; gap:0.35rem; background:var(--bg); border:1px solid var(--border); border-radius:0.5rem; padding:0.32rem 0.7rem; font-size:0.85rem; font-family:var(--mono); }
+  .chip-x { cursor:pointer; color:var(--text-muted); font-weight:700; }
+  .chip-x:hover { color:#dc2626; }
+  .sub-add { display:flex; align-items:center; gap:0.4rem; }
+  .sub-time-input {
+    width: 4.8rem; min-width: 0;
+    padding: 0.32rem 0.5rem;           /* 竖向 padding 与时间片一致 → 同高 */
+    font-size: 0.85rem; font-family: var(--mono);
+    box-sizing: border-box;
+  }
+  .sub-fields { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:1rem; }
+  .sub-field { display:flex; flex-direction:column; gap:0.35rem; min-width:0; }
+  .sub-field .glass-input { width:100%; min-width:0; }
+  .sub-field label { font-size:0.82rem; color:var(--text-secondary); font-weight:500; display:flex; align-items:center; gap:0.3rem; }
+  .sub-range { display:flex; align-items:center; gap:0.4rem; min-width:0; }
+  .sub-range .glass-input { min-width:0; }
+  .sub-range span { color:var(--text-muted); }
+  .sub-field-hint { font-size:0.72rem; color:var(--text-muted); }
+  .sub-foot { display:flex; justify-content:flex-end; gap:0.6rem; margin-top:1rem; }
+  .sub-foot .glass-button { border-radius:0.5rem; }
+</style>
+
+<!-- 手机端设置详情视图头：导航条下方「‹ 返回 + 标题」，点菜单项后显示 -->
+<div class="settings-view-head" id="settings-view-head" hidden>
+  <button type="button" class="settings-view-back" id="settings-view-back">{{ icon('chevron-left', 20) }}<span>返回</span></button>
+  <div class="settings-view-title" id="settings-view-title"></div>
+</div>
+
+<div class="settings-page">
+  <aside class="settings-side">
+    <a class="side-item" data-target="basic">{{ icon('settings', 16) }} 基础设置</a>
+    <a class="side-item" data-target="access">{{ icon('user', 16) }} 访问控制</a>
+    <a class="side-item" data-target="proxy">{{ icon('globe', 16) }} 代理配置</a>
+    <a class="side-item" data-target="sub">{{ icon('bell', 16) }} 订阅配置</a>
+    <a class="side-item" data-target="api">{{ icon('key', 16) }} API 配置</a>
+    <div class="side-group" data-group="dl">
+      <span class="side-item">{{ icon('download', 16) }} 下载设置 <span class="group-chev">{{ icon('chevron-down', 13) }}</span></span>
+      <div class="side-subs">
+        <a class="side-item side-sub" data-target="dl-priority">{{ icon('list', 15) }} 下载器优先级</a>
+        <a class="side-item side-sub" data-target="res-priority">{{ icon('star', 15) }} 资源优先级</a>
+        <a class="side-item side-sub" data-target="openlist">{{ icon('folder', 15) }} OpenList</a>
+        <a class="side-item side-sub" data-target="clouddrive2">{{ icon('database', 15) }} CloudDrive2</a>
+        <a class="side-item side-sub" data-target="pan115">{{ icon('server', 15) }} 115 网盘</a>
+        <a class="side-item side-sub" data-target="aria2">{{ icon('download', 15) }} Aria2</a>
+        <a class="side-item side-sub" data-target="qb">{{ icon('download', 15) }} qBittorrent</a>
+        <a class="side-item side-sub" data-target="xunlei">{{ icon('download', 15) }} 迅雷</a>
+      </div>
+    </div>
+    <div class="side-group" data-group="media">
+      <span class="side-item">{{ icon('film', 16) }} 媒体库设置 <span class="group-chev">{{ icon('chevron-down', 13) }}</span></span>
+      <div class="side-subs">
+        <a class="side-item side-sub" data-target="mediaserver">{{ icon('server', 15) }} 媒体服务器</a>
+      </div>
+    </div>
+    <div class="side-group" data-group="play">
+      <span class="side-item">{{ icon('play', 16) }} 播放设置 <span class="group-chev">{{ icon('chevron-down', 13) }}</span></span>
+      <div class="side-subs">
+        <a class="side-item side-sub" data-target="play">{{ icon('play', 15) }} 播放器</a>
+      </div>
+    </div>
+    <div class="side-group" data-group="notify">
+      <span class="side-item">{{ icon('bell', 16) }} 通知设置 <span class="group-chev">{{ icon('chevron-down', 13) }}</span></span>
+      <div class="side-subs">
+        <a class="side-item side-sub" data-target="notify">{{ icon('bell', 15) }} 通知</a>
+      </div>
+    </div>
+  </aside>
+
+  <main class="settings-main">
+    <div class="panel active" id="panel-basic">
+      <div class="detail-section">
+        <div class="section-title">{{ icon('server') }} 服务配置</div>
+        <div class="dbs-card-title" style="font-size:0.92rem;">服务地址 / 端口</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+          <div class="form-row"><label>监听地址</label><input class="glass-input" id="set-host" value="{{ cfg.get('host','') }}"></div>
+          <div class="form-row"><label>监听端口</label><input class="glass-input" id="set-port" type="number" value="{{ cfg.get('port','') }}"></div>
+        </div>
+        <div class="form-hint" style="margin-bottom:1rem;">修改监听地址/端口后需重启服务生效。</div>
+        <div class="section-title" style="margin-top:1rem;">{{ icon('user') }} 登录（本网站）</div>
+        <div class="form-row"><label>登录用户名</label><input class="glass-input" id="set-user" value="{{ cfg.get('web_username','') }}"></div>
+        <div class="form-row"><label>登录密码</label><input class="glass-input" id="set-pass" type="password" value="{{ cfg.get('web_password','') }}"></div>
+        <button class="glass-button" onclick="saveBasic()">{{ icon('check', 15) }} 保存</button>
+      </div>
+
+      <div class="detail-section" style="margin-top:1.2rem;">
+        <div class="section-title">{{ icon('download') }} 抓取</div>
+        <div class="form-row">
+          <label>JAVBUS 域名</label>
+          <input class="glass-input" id="set-javbus" value="{{ cfg.get('javbus_base','') }}" placeholder="https://www.javbus.com">
+          <span class="form-hint">JAVBUS 经常换域名，抓磁链失败时改这里。</span>
+        </div>
+        <div class="form-row">
+          <label>请求限流间隔（秒）</label>
+          <input class="glass-input" id="set-min-interval" type="number" step="0.1" min="0" value="{{ cfg.get('min_interval', 0.5) }}">
+        </div>
+        <button class="glass-button" onclick="saveCfg({javbus_base: v('set-javbus'), min_interval: parseFloat(v('set-min-interval'))||0.5})">{{ icon('check', 15) }} 保存</button>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-access">{{ placeholder('访问控制暂未接入。') }}</div>
+
+    <div class="panel" id="panel-proxy">
+      <div class="detail-section">
+        <div class="section-title">{{ icon('globe') }} 网络代理</div>
+        <div class="form-row">
+          <label>网络代理（可选）</label>
+          <input class="glass-input" id="set-proxy" value="{{ cfg.get('proxy','') }}" placeholder="如 http://127.0.0.1:7890">
+          <span class="form-hint">所有 JAVDB / JAVBUS 请求走此代理；图片（封面/预览图）本地解码可直连。</span>
+        </div>
+        <div class="form-row">
+          <label>图片线路</label>
+          <select class="glass-input" id="set-image-route">
+            <option value="auto" {{ 'selected' if cfg.get('image_route','auto') == 'auto' }}>自动（直连优先，失败走代理）</option>
+            <option value="direct" {{ 'selected' if cfg.get('image_route','auto') == 'direct' }}>直连（不走代理）</option>
+            <option value="proxy" {{ 'selected' if cfg.get('image_route','auto') == 'proxy' }}>代理</option>
+          </select>
+        </div>
+        <button class="glass-button" onclick="saveCfg({proxy: v('set-proxy'), image_route: v('set-image-route')})">{{ icon('check', 15) }} 保存</button>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-sub">
+      <!-- 区块①：订阅配置 -->
+      <div class="detail-section">
+        <div class="sub-block-head">
+          <div class="section-title" style="margin-bottom:0;display:flex;align-items:center;gap:0.5rem;">{{ icon('bell', 18) }} <span>订阅配置</span> <span class="badge cd2-hot">热更新</span></div>
+          <button type="button" class="sub-pill pill-off" id="sub-check-pill" data-on="{{ '1' if cfg.get('sub_check_enabled') else '0' }}" onclick="toggleSubPill(this)">已禁用</button>
+        </div>
+        <div class="sub-info">{{ icon('info', 14) }} 调度模式：设置「每日检查时间」后，「检查间隔」将被忽略</div>
+
+        <div class="sub-time-label">每日检查时间 <span title="到点检查全部订阅（刷新命中数据，不推送）" class="sub-q">ⓘ</span></div>
+        <div class="sub-time-row">
+          <div class="sub-time-chips" id="sub-daily-chips">
+            {% for t in cfg.get('sub_daily_times', []) %}<span class="sub-time-chip" data-time="{{ t }}">{{ t }} <a class="chip-x" data-kind="daily" onclick="removeChip(event,this)">×</a></span>{% endfor %}
+          </div>
+          <div class="sub-add">
+            <input class="glass-input sub-time-input" data-kind="daily" placeholder="输入时间" autocomplete="off" maxlength="5"
+                   oninput="this.value=this.value.replace(/[^0-9:]/g,'')"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();addSubTime('daily');}">
+            <button type="button" class="dir-btn" onclick="addSubTime('daily')" title="添加时间">{{ icon('plus', 13) }}</button>
+          </div>
+        </div>
+
+        <div class="sub-fields">
+          <div class="sub-field"><label>检查间隔（分钟）<span class="sub-q">ⓘ</span></label><input class="glass-input" id="sub-interval" type="number" min="120" value="{{ cfg.get('sub_check_interval', 120) }}"><div class="sub-field-hint">最小120分钟</div></div>
+          <div class="sub-field"><label>并发数量<span class="sub-q">ⓘ</span></label><input class="glass-input" id="sub-conc" type="number" min="0" value="{{ cfg.get('sub_concurrency', 2) }}"><div class="sub-field-hint"><label class="switch-label" style="font-size:0.78rem;"><input type="checkbox" id="sub-retry" {{ 'checked' if cfg.get('sub_retry_enabled', True) }}> 启用重试</label></div></div>
+          <div class="sub-field"><label>间隔范围（秒）<span class="sub-q">ⓘ</span></label><div class="sub-range"><input class="glass-input" id="sub-interval-min" type="number" min="0" value="{{ cfg.get('sub_interval_min', 3) }}"><span>-</span><input class="glass-input" id="sub-interval-max" type="number" min="0" value="{{ cfg.get('sub_interval_max', 10) }}"></div></div>
+          <div class="sub-field"><label>请求超时（秒）<span class="sub-q">ⓘ</span></label><input class="glass-input" id="sub-timeout" type="number" min="1" value="{{ cfg.get('sub_timeout', 30) }}"><div class="sub-field-hint">建议 30 秒</div></div>
+        </div>
+      </div>
+
+      <!-- 区块②：自动同步在线订阅 -->
+      <div class="detail-section">
+        <div class="sub-block-head">
+          <div class="section-title" style="margin-bottom:0;display:flex;align-items:center;gap:0.5rem;">{{ icon('clock', 18) }} <span>自动同步在线订阅</span> <span class="badge cd2-hot">热更新</span></div>
+          <button type="button" class="sub-pill pill-off" id="sub-sync-pill" data-on="{{ '1' if cfg.get('sub_sync_enabled') else '0' }}" onclick="toggleSubPill(this)">已禁用</button>
+        </div>
+        <div class="sub-time-label">同步时间表 <span title="到点推送（全量订阅执行，与订阅页右上角「执行订阅」一致）" class="sub-q">ⓘ</span></div>
+        <div class="sub-time-row">
+          <div class="sub-time-chips" id="sub-sync-chips">
+            {% for t in cfg.get('sub_sync_times', []) %}<span class="sub-time-chip" data-time="{{ t }}">{{ t }} <a class="chip-x" data-kind="sync" onclick="removeChip(event,this)">×</a></span>{% endfor %}
+          </div>
+          <div class="sub-add">
+            <input class="glass-input sub-time-input" data-kind="sync" placeholder="输入时间" autocomplete="off" maxlength="5"
+                   oninput="this.value=this.value.replace(/[^0-9:]/g,'')"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();addSubTime('sync');}">
+            <button type="button" class="dir-btn" onclick="addSubTime('sync')" title="添加时间">{{ icon('plus', 13) }}</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 整页保存：两区块之外，保存整个订阅配置 -->
+      <div class="sub-foot">
+        <button type="button" class="glass-button" onclick="saveSub()">{{ icon('save', 14) }} 保存配置</button>
+        <button type="button" class="glass-button ghost" onclick="reloadSub()">{{ icon('refresh', 14) }} 重新加载</button>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-api">
+      <div class="detail-section">
+        <div class="section-title">{{ icon('key') }} JAVDB API</div>
+        <div class="form-row">
+          <label>JAVDB API 节点</label>
+          <select class="glass-input" id="set-api-base">
+            {% for name, base in api_nodes %}
+            <option value="{{ base }}" {{ 'selected' if cfg.get('api_base','') == base else '' }}>{{ name }}（{{ base }}）</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-row"><label>JAVDB 用户名（Top250 / 完整评论需要）</label><input class="glass-input" id="set-javdb-user" value="{{ cfg.get('javdb_username','') }}"></div>
+        <div class="form-row"><label>JAVDB 密码</label><input class="glass-input" id="set-javdb-pass" type="password" value="{{ cfg.get('javdb_password','') }}"></div>
+        <div class="form-row"><label>JAVDB Token</label><input class="glass-input" id="set-javdb-token" value="{{ cfg.get('javdb_token','') }}"></div>
+        <div style="display:flex;gap:0.6rem;">
+          <button class="glass-button" onclick="saveCfg({api_base: v('set-api-base'), javdb_username: v('set-javdb-user'), javdb_password: v('set-javdb-pass'), javdb_token: v('set-javdb-token')})">{{ icon('check', 15) }} 保存</button>
+          <button class="glass-button ghost" onclick="loginJavdb2()">{{ icon('key', 15) }} 登录 JAVDB 获取 Token</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-dl-priority">
+      <div class="detail-section">
+        <div class="section-title">{{ icon('server') }} 下载器优先级</div>
+        <div class="dl-hint">可用列表（按优先顺序，排在前面的优先使用）</div>
+        <div class="dl-list">
+          {% for d in downloaders if d['enabled'] %}
+          <div class="dl-item">
+            <span class="dl-rank">{{ loop.index }}</span><span class="dl-name">{{ d['name'] }}</span><span class="badge">已启用</span>
+            <div class="dl-actions">
+              <button class="dl-btn" onclick="dlOrder({{ d['id'] }},'up')" title="上移">↑</button>
+              <button class="dl-btn" onclick="dlOrder({{ d['id'] }},'down')" title="下移">↓</button>
+              <button class="dl-btn" onclick="dlToggle({{ d['id'] }},0)" title="禁用">禁用</button>
+            </div>
+          </div>
+          {% else %}<div class="dl-item muted"><span class="dl-name">暂无启用的下载器</span></div>{% endfor %}
+        </div>
+        <div class="dl-hint">不可用列表（已禁用，固定在底部）</div>
+        <div class="dl-list">
+          {% for d in downloaders if not d['enabled'] %}
+          <div class="dl-item muted">
+            <span class="dl-rank">{{ loop.index }}</span><span class="dl-name">{{ d['name'] }}</span><span class="badge dl-badge-off">不可用</span>
+            <div class="dl-actions">
+              <button class="dl-btn" onclick="dlOrder({{ d['id'] }},'up')" title="上移">↑</button>
+              <button class="dl-btn" onclick="dlOrder({{ d['id'] }},'down')" title="下移">↓</button>
+              <button class="dl-btn" onclick="dlToggle({{ d['id'] }},1)" title="启用">启用</button>
+            </div>
+          </div>
+          {% else %}<div class="dl-item muted"><span class="dl-name">暂无禁用项</span></div>{% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-res-priority">{{ placeholder('资源优先级暂未接入。') }}</div>
+    <div class="panel" id="panel-openlist">{{ placeholder('OpenList 暂未接入。') }}</div>
+    <div class="panel" id="panel-clouddrive2">
+      <div class="detail-section cd2-panel">
+        <div class="cd2-head">
+          <div class="section-title" style="margin-bottom:0;display:flex;align-items:center;gap:0.5rem;">
+            {{ icon('cloud', 18) }} <span>CloudDrive2 配置</span>
+            <span class="badge cd2-hot">热更新</span>
+          </div>
+          <label class="switch-label cd2-enable">
+            <input type="checkbox" id="cd2-enabled" {{ 'checked' if clouddrive2['enabled'] }} onchange="toggleCd2(this)"> <span id="cd2-enable-label">{{ '已启用' if clouddrive2['enabled'] else '已禁用' }}</span>
+          </label>
+        </div>
+
+        <div class="cd2-grid">
+          <div class="cd2-field"><label>服务地址</label><input class="glass-input" id="cd2-host" value="{{ clouddrive2.get('host','127.0.0.1') }}" placeholder="127.0.0.1"></div>
+          <div class="cd2-field"><label>gRPC 端口</label><input class="glass-input" id="cd2-port" type="number" min="1" max="65535" value="{{ clouddrive2.get('rpc_port',19798) }}" placeholder="19798"></div>
+          <div class="cd2-field"><label>超时时间(秒)</label><input class="glass-input" id="cd2-timeout" type="number" min="1" value="{{ clouddrive2.get('timeout',30) }}" placeholder="30"></div>
+          <div class="cd2-field"><label>启用 ed2k 支持 <span title="是否允许通过 CloudDrive2 离线下载 ed2k 链接">ⓘ</span></label>
+            <select class="glass-input" id="cd2-ed2k">
+              <option value="0" {{ 'selected' if not clouddrive2['enable_ed2k'] }}>否</option>
+              <option value="1" {{ 'selected' if clouddrive2['enable_ed2k'] }}>是</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="cd2-field" style="margin-bottom:1rem;"><label>API Token</label>
+          <div style="display:flex;gap:0.5rem;align-items:center;">
+            <input class="glass-input" id="cd2-token" type="password" value="{{ clouddrive2.get('api_token','') }}" placeholder="粘贴 CloudDrive2 API 令牌" autocomplete="off">
+            <button type="button" class="dir-btn" onclick="toggleCd2Creds(this)" title="使用账号/密码自动获取 Token">{{ icon('key', 13) }} 获取 Token</button>
+          </div>
+          <div id="cd2-creds" style="display:none;margin-top:0.5rem;">
+            <div class="cd2-grid" style="grid-template-columns:1fr 1fr;">
+              <div class="cd2-field"><label>账号</label><input class="glass-input" id="cd2-user" value="{{ clouddrive2.get('user_name','') }}" placeholder="CloudDrive2 账号或邮箱" autocomplete="off"></div>
+              <div class="cd2-field"><label>密码</label><input class="glass-input" id="cd2-pass" type="password" value="{{ clouddrive2.get('password','') }}" placeholder="密码" autocomplete="off"></div>
+            </div>
+            <button type="button" class="glass-button" style="font-size:0.82rem;padding:0.4rem 0.8rem;margin-top:0.5rem;" onclick="getCd2Token()">{{ icon('key', 14) }} 登录并填入 Token</button>
+          </div>
+        </div>
+
+        <div class="cd2-field"><label>保存路径 <span title="下载完成后文件保存到 CloudDrive2 的位置">ⓘ</span></label><input class="glass-input" id="cd2-save-path" value="{{ clouddrive2.get('save_path','') }}" placeholder="/downloads/{actor_name}"></div>
+        <div class="form-hint cd2-var-hint">下载文件保存路径，支持变量：</div>
+        <div class="cd2-vars">
+          <span class="cd2-var">{release_date}</span> 发行日期、
+          <span class="cd2-var">{publish_date}</span> 推送日期、
+          <span class="cd2-var">{actor_name}</span> 演员名称、
+          <span class="cd2-var">{sub_name}</span> 综合订阅名称（系列/片商/发行商/导演/清单/前缀/关注的名称）。
+        </div>
+        <div class="form-hint" style="margin-top:0.4rem;">示例：<span class="cd2-var">/downloads/{actor_name}/{release_date}</span> 或 <span class="cd2-var">/downloads/{sub_name}/{release_date}</span></div>
+
+        <div class="cd2-test">
+          <button type="button" class="cd2-test-btn" id="cd2-test-btn" onclick="testClouddrive2()" disabled>
+            <span class="cd2-test-icon">{{ icon('activity', 14) }}</span> 测试连接
+          </button>
+          <div class="cd2-test-msg" id="cd2-test-msg">请先启用 CloudDrive2 后再进行测试</div>
+        </div>
+
+        <div class="cd2-foot">
+          <button type="button" class="glass-button ghost" onclick="reloadClouddrive2()">{{ icon('refresh', 14) }} 重新加载</button>
+          <button type="button" class="glass-button" onclick="saveClouddrive2()">{{ icon('save', 14) }} 保存配置</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-pan115">
+      <div class="detail-section">
+        <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>{{ icon('server') }} 115 网盘配置</span>
+          <label class="switch-label"><input type="checkbox" id="p115-enabled" {{ 'checked' if pan115['enabled'] }}> 已启用</label>
+        </div>
+        <div class="form-row">
+          <label>115 Cookie</label>
+          <input class="glass-input" id="p115-cookie" type="password" value="{{ pan115['cookie'] }}" placeholder="从浏览器登录 115 后复制 Cookie">
+          <span class="form-hint">用于身份认证，从浏览器获取 115 网盘的 Cookie（浏览器 F12 → Network → 复制请求头 Cookie）。</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+          <div class="form-row"><label>超时时间（秒）</label><input class="glass-input" id="p115-timeout" type="number" min="0" value="{{ pan115['timeout'] }}"></div>
+          <div class="form-row"><label>保留配额</label><input class="glass-input" id="p115-quota" type="number" min="0" value="{{ pan115['quota'] }}"></div>
+        </div>
+        <div class="form-row">
+          <label>下载目录</label>
+          <div class="dir-picker">
+            <button type="button" class="dir-btn" onclick="pickRoot()">{{ icon('home', 13) }} 根目录</button>
+            <button type="button" class="dir-btn" onclick="pickUp()">{{ icon('refresh', 13) }} 上一级</button>
+            <select class="glass-input dir-sel" id="p115-dir-sel" onchange="pickSelect(this)"></select>
+            <button type="button" class="glass-button" style="font-size:0.82rem;padding:0.4rem 0.8rem;" onclick="setAsTarget()">选此目录</button>
+          </div>
+          <span class="form-hint">当前：<span id="p115-target-cid">{{ pan115['target_cid'] }}</span> <span id="p115-target-name">{{ pan115['target_name'] }}</span></span>
+        </div>
+        <div style="display:flex;gap:0.6rem;">
+          <button type="button" class="glass-button" onclick="testPan115()">{{ icon('activity', 15) }} 测试连接</button>
+          <button type="button" class="glass-button ghost" onclick="savePan115()">{{ icon('check', 15) }} 保存配置</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-aria2">{{ placeholder('Aria2 暂未接入。') }}</div>
+    <div class="panel" id="panel-qb">{{ placeholder('qBittorrent 暂未接入。') }}</div>
+    <div class="panel" id="panel-xunlei">{{ placeholder('迅雷 暂未接入。') }}</div>
+
+    <div class="panel" id="panel-mediaserver">
+      <div class="detail-section">
+        <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>{{ icon('server') }} 媒体服务器（Emby / Jellyfin）</span>
+          <button class="glass-button" onclick="syncLibrary()" style="font-size:0.82rem;padding:0.4rem 0.8rem;">{{ icon('refresh', 14) }} 立即同步全库</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:0.6rem;margin-bottom:1rem;">
+          {% for s in servers %}
+          <div class="server-card">
+            <div class="server-info"><div class="server-name">{{ s['name'] }} <span class="badge">{{ s['type'] }}</span></div><div class="server-url">{{ s['url'] }}</div></div>
+            <div class="server-actions">
+              <button class="copy-btn" onclick="pingServer({{ s['id'] }})">{{ icon('activity', 13) }} 测试</button>
+              <button class="copy-btn" style="color:#dc2626;border-color:#dc2626" onclick="delServer({{ s['id'] }})">{{ icon('trash', 13) }} 删除</button>
+            </div>
+          </div>
+          {% else %}<div class="empty-card" style="padding:1.5rem;">还没有配置媒体服务器。</div>{% endfor %}
+        </div>
+        <div class="section-title" style="font-size:0.92rem;">添加服务器</div>
+        <form id="server-form" style="display:grid;grid-template-columns:1fr 1.4fr 1fr 0.8fr auto;gap:0.5rem;align-items:center;">
+          <input class="glass-input" name="name" placeholder="名称，如 客厅Emby" required>
+          <input class="glass-input" name="url" placeholder="http://192.168.1.10:8096" required>
+          <input class="glass-input" name="api_key" placeholder="API Key" required>
+          <select class="glass-input" name="type"><option value="emby">Emby</option><option value="jellyfin">Jellyfin</option></select>
+          <button type="submit" class="glass-button">{{ icon('plus', 15) }} 添加</button>
+        </form>
+        <div class="form-hint" style="margin-top:0.5rem;">API Key 在 Emby/Jellyfin 的「设置 → API 密钥」里生成。</div>
+      </div>
+
+      <div class="detail-section">
+        <div class="section-title">{{ icon('clock') }} 入库缓存设置</div>
+        <div class="dbs-card-title" style="font-size:0.9rem;">定时刷新计划 <span class="form-hint" style="display:inline">ⓘ</span></div>
+        <input class="glass-input" id="sync-cron" value="{{ sync_cron }}" placeholder="分 时 日 月 星期" style="width:100%;font-family:var(--mono)">
+        <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin:0.6rem 0;">
+          <button class="dir-btn" onclick="setCron('30 0 * * *')">每天 00:30</button>
+          <button class="dir-btn" onclick="setCron('20 1 * * *')">每天 01:20</button>
+          <button class="dir-btn" onclick="setCron('0 2 * * 0')">每周日 02:00</button>
+          <button class="dir-btn" onclick="setCron('0 23 2 * *')">每月 2号 23:00</button>
+          <button class="dir-btn" onclick="setCron('0 */6 * * *')">每 6 小时</button>
+          <button class="dir-btn" onclick="setCron('0 */12 * * *')">每 12 小时</button>
+          <button class="glass-button" style="font-size:0.82rem;padding:0.4rem 0.8rem;" onclick="saveSyncCron()">{{ icon('check', 14) }} 保存计划</button>
+        </div>
+        <div class="form-hint">Cron 格式：分(0-59) 时(0-23) 日(1-31) 月(1-12) 星期(0-6，0=周日)</div>
+        <div class="dbs-card-title" style="font-size:0.9rem;margin-top:1rem;">手动刷新缓存</div>
+        <button class="outline-btn" onclick="syncLibrary()">{{ icon('refresh', 15) }} 立即刷新</button>
+        <div class="dbs-card-title" style="font-size:0.9rem;margin-top:1rem;">媒体库影片数量</div>
+        <div style="display:flex;gap:0.6rem;flex-wrap:wrap;" id="sync-stats">加载中…</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-play">
+      <div class="detail-section">
+        <div class="section-title">{{ icon('play') }} 默认外置播放器</div>
+        <div class="form-row">
+          <label>「用电脑播放器」默认目标</label>
+          <select class="glass-input" id="set-default-player">
+            {% for p in players %}
+            <option value="{{ p['key'] }}" {{ 'selected' if (default_player or players[0]['key']) == p['key'] }}>{{ p['label'] }}</option>
+            {% endfor %}
+          </select>
+          <span class="form-hint">通过系统 URL scheme 唤起本地播放器；若协议未注册，播放键菜单内仍可「复制播放地址」。</span>
+        </div>
+        <button class="glass-button" onclick="saveCfg({default_player: v('set-default-player')})">{{ icon('check', 15) }} 保存</button>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-notify">{{ placeholder('通知设置暂未接入。') }}</div>
+  </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function v(id) { return document.getElementById(id).value; }
+
+async function jsonPost(url, body) {
+  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  return r.json();
+}
+async function saveCfg(fields) {
+  try {
+    const j = await jsonPost('/api/settings', fields);
+    toast(j.ok ? '已保存' : ('保存失败' + (j.error||'')));
+    if (j.ok) setTimeout(function(){ location.reload(); }, 500);
+  } catch (e) { toast('保存失败：' + e); }
+}
+async function saveBasic() {
+  await saveCfg({host: v('set-host'), port: parseInt(v('set-port'))||9091,
+                 web_username: v('set-user'), web_password: v('set-pass')});
+}
+
+// —— 侧边菜单 ——
+(function () {
+  var items = document.querySelectorAll('.settings-side .side-item[data-target]');
+  var panels = document.querySelectorAll('.settings-main .panel');
+  var head = document.getElementById('settings-view-head');
+  var headTitle = document.getElementById('settings-view-title');
+  var backBtn = document.getElementById('settings-view-back');
+  function isMobile() { return window.innerWidth <= 768; }
+  function activate(target) {
+    items.forEach(function (it) { it.classList.toggle('active', it.dataset.target === target); });
+    panels.forEach(function (p) { p.classList.toggle('active', p.id === 'panel-' + target); });
+    if (target === 'mediaserver') loadSyncStats();
+    try { localStorage.setItem('jd_settings_panel', target); } catch (e) {}
+  }
+  // 手机端：进详情 → 给 .settings-page 加 detail-open 类（CSS 控制菜单/面板显隐）
+  function showDetail(item) {
+    var target = item.dataset.target;
+    activate(target);
+    // 标题 = 菜单项图标 + 文字（去掉箭头），对齐参考图2「⚙ 基础设置」
+    var label = item.textContent.trim();
+    if (headTitle) {
+      headTitle.innerHTML = '';
+      var iconSvg = item.querySelector('svg');
+      if (iconSvg) { var c = iconSvg.cloneNode(true); headTitle.appendChild(c); }
+      headTitle.appendChild(document.createTextNode(label));
+    }
+    if (head) head.hidden = false;
+    // 用 .detail-open 类切换视图：只显示当前 panel
+    document.querySelectorAll('.settings-page').forEach(function (pg) { pg.classList.add('detail-open'); });
+    if (window.scrollTo) window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  // 手机端：返回菜单 → 移除 detail-open，回到只显示菜单；清掉高亮、只留纯色列表
+  function showMenu() {
+    document.querySelectorAll('.settings-page').forEach(function (pg) { pg.classList.remove('detail-open'); });
+    if (head) head.hidden = true;
+    // 清掉菜单项高亮（菜单视图下无选中项）
+    items.forEach(function (it) { it.classList.remove('active'); });
+  }
+  function onItemClick(it, e) {
+    e.preventDefault();
+    if (isMobile()) showDetail(it);
+    else activate(it.dataset.target);
+  }
+  items.forEach(function (it) {
+    it.addEventListener('click', function (e) { onItemClick(it, e); });
+  });
+  document.querySelectorAll('.settings-side .side-group').forEach(function (g) {
+    g.querySelector('.side-item').addEventListener('click', function (e) {
+      e.preventDefault(); g.classList.toggle('open');
+    });
+  });
+  if (backBtn) {
+    backBtn.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation(); showMenu();
+    });
+  }
+  // 重新变为桌面宽度时恢复菜单显示
+  window.addEventListener('resize', function () {
+    if (!isMobile()) { showMenu(); }
+  });
+  var saved = null;
+  try { saved = localStorage.getItem('jd_settings_panel'); } catch (e) {}
+  var first = document.querySelector('.settings-side .side-item[data-target]');
+  var target = (saved && document.querySelector('.side-item[data-target="' + saved + '"]')) ? saved : (first ? first.dataset.target : null);
+  if (isMobile()) {
+    // 手机上默认只显示菜单列表（移除 detail-open、隐藏所有 panel）
+    document.querySelectorAll('.settings-page').forEach(function (pg) { pg.classList.remove('detail-open'); });
+    panels.forEach(function (p) { p.classList.remove('active'); });
+    if (head) head.hidden = true;
+  } else if (target) {
+    activate(target);
+  }
+})();
+
+// —— 媒体服务器 ——
+document.getElementById('server-form').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  var fd = new FormData(this);
+  var data = {name: fd.get('name'), url: fd.get('url'), api_key: fd.get('api_key'), type: fd.get('type')};
+  try {
+    var j = await jsonPost('/api/servers', data);
+    if (j.ok) { toast('已添加服务器'); setTimeout(function(){ location.reload(); }, 400); }
+    else toast('添加失败：' + (j.error || ''));
+  } catch (err) { toast('添加失败：' + err); }
+});
+async function delServer(id) {
+  if (!confirm('确认删除该服务器？')) return;
+  var r = await fetch('/api/servers/' + id, {method: 'DELETE'}); var j = await r.json();
+  if (j.ok) { toast('已删除'); setTimeout(function(){ location.reload(); }, 400); } else toast('删除失败');
+}
+async function pingServer(id) {
+  toast('正在测试连接…');
+  try { var r = await fetch('/api/server/ping/' + id); var j = await r.json(); toast(j.ok ? (j.msg || '连接成功') : ('连接失败：' + (j.msg || ''))); }
+  catch (err) { toast('测试失败：' + err); }
+}
+async function syncLibrary() {
+  toast('正在同步媒体库…');
+  try { var r = await fetch('/api/sync', {method: 'POST'}); var j = await r.json(); toast(j.ok ? ('同步完成，共 ' + j.total + ' 个番号') : ('同步失败：' + (j.error || ''))); if (j.ok) loadSyncStats(); }
+  catch (err) { toast('同步失败：' + err); }
+}
+async function setCron(c) { document.getElementById('sync-cron').value = c; }
+async function saveSyncCron() {
+  try { var j = await jsonPost('/api/sync/schedule', {cron: document.getElementById('sync-cron').value.trim()}); toast(j.ok ? '定时计划已保存' : '保存失败'); }
+  catch (e) { toast('保存失败：' + e); }
+}
+async function loadSyncStats() {
+  var el = document.getElementById('sync-stats');
+  if (!el) return;
+  try {
+    var j = await (await fetch('/api/sync/stats')).json();
+    var html = '';
+    if (j.ok) {
+      (j.servers || []).forEach(function (s) { html += '<div class="stat-card" style="min-width:100px"><div class="stat-num">' + s.cnt + '</div><div class="stat-label">' + s.name + '</div></div>'; });
+      html += '<div class="stat-card" style="min-width:100px"><div class="stat-num">' + j.total + '</div><div class="stat-label">总数</div></div>';
+    }
+    el.innerHTML = html || '暂无数据';
+  } catch (e) { el.textContent = '加载失败'; }
+}
+
+// —— JAVDB 登录 ——
+async function loginJavdb2() {
+  var username = v('set-javdb-user').trim(), password = v('set-javdb-pass');
+  if (!username || !password) { toast('请先填写 JAVDB 用户名和密码'); return; }
+  toast('正在登录 JAVDB…');
+  try {
+    var j = await jsonPost('/api/javdb-login', {username: username, password: password});
+    toast(j.ok ? '登录成功，Token 已保存' : ('登录失败：' + (j.error || '')));
+    if (j.ok) setTimeout(function(){ location.reload(); }, 600);
+  } catch (err) { toast('登录失败：' + err); }
+}
+
+// —— 115 网盘 ——
+var _pickStack = [{name:'根目录', cid:'0'}];
+async function testPan115() {
+  var cookie = document.getElementById('p115-cookie').value.trim();
+  if (!cookie) { toast('请先填写 115 Cookie'); return; }
+  toast('正在测试连接…');
+  try { var j = await jsonPost('/api/pan115/test', {cookie: cookie}); toast(j.ok ? ('连接成功：' + j.msg) : ('连接失败：' + (j.msg || ''))); }
+  catch (e) { toast('测试失败：' + e); }
+}
+async function loadDirs() {
+  var cur = _pickStack[_pickStack.length - 1];
+  try {
+    var j = await jsonPost('/api/pan115/dirs', {cid: cur.cid});
+    var sel = document.getElementById('p115-dir-sel'); sel.innerHTML = '';
+    (j.dirs || []).forEach(function (f) { var o = document.createElement('option'); o.value = f.cid; o.textContent = f.name; sel.appendChild(o); });
+    var bc = _pickStack.map(function (x) { return x.name; }).join(' / ');
+    var nm = document.getElementById('p115-target-name'); if (nm) nm.innerHTML = '路径：' + bc;
+  } catch (e) { toast('加载目录失败：' + e); }
+}
+function pickRoot() { _pickStack = [{name:'根目录', cid:'0'}]; loadDirs(); }
+function pickUp() { if (_pickStack.length > 1) { _pickStack.pop(); loadDirs(); } }
+function pickSelect(sel) {
+  if (!sel.value) return;
+  var name = sel.options[sel.selectedIndex].text;
+  _pickStack.push({name:name, cid:sel.value}); loadDirs();
+}
+function setAsTarget() {
+  var cur = _pickStack[_pickStack.length - 1];
+  document.getElementById('p115-target-cid').textContent = cur.cid;
+  document.getElementById('p115-target-name').textContent = cur.name;
+  toast('已选目录：' + cur.name + ' (' + cur.cid + ')');
+}
+async function savePan115() {
+  var body = {
+    cookie: document.getElementById('p115-cookie').value.trim(),
+    timeout: parseInt(document.getElementById('p115-timeout').value || '30') || 30,
+    quota: parseInt(document.getElementById('p115-quota').value || '0') || 0,
+    target_cid: document.getElementById('p115-target-cid').textContent.trim(),
+    target_name: document.getElementById('p115-target-name').textContent.trim() || '',
+    enabled: document.getElementById('p115-enabled').checked ? 1 : 0,
+  };
+  try { var j = await jsonPost('/api/pan115/config', body); toast(j.ok ? '115 配置已保存' : ('保存失败：' + (j.error || ''))); if (j.ok) setTimeout(function(){ location.reload(); }, 600); }
+  catch (e) { toast('保存失败：' + e); }
+}
+
+// —— 下载器优先级 ——
+async function dlToggle(id, enabled) {
+  try { var j = await jsonPost('/api/downloader/toggle', {id:id, enabled:enabled}); toast(j.ok ? '已更新' : ('更新失败：' + (j.error || ''))); if (j.ok) setTimeout(function(){ location.reload(); }, 400); }
+  catch (e) { toast('更新失败：' + e); }
+}
+async function dlOrder(id, direction) {
+  try { var j = await jsonPost('/api/downloader/order', {id:id, direction:direction}); if (j.ok) setTimeout(function(){ location.reload(); }, 300); }
+  catch (e) { toast('排序失败：' + e); }
+}
+
+// —— CloudDrive2 ——
+function cd2Body() {
+  return {
+    host: v('cd2-host'),
+    rpc_port: parseInt(v('cd2-port')) || 19798,
+    timeout: parseInt(v('cd2-timeout')) || 30,
+    enable_ed2k: v('cd2-ed2k') === '1' ? 1 : 0,
+    api_token: v('cd2-token'),
+    user_name: v('cd2-user'),
+    password: v('cd2-pass'),
+    save_path: v('cd2-save-path'),
+    enabled: document.getElementById('cd2-enabled').checked ? 1 : 0,
+  };
+}
+function syncCd2State() {
+  var on = document.getElementById('cd2-enabled').checked;
+  var btn = document.getElementById('cd2-test-btn');
+  var msg = document.getElementById('cd2-test-msg');
+  var lbl = document.getElementById('cd2-enable-label');
+  btn.disabled = !on;
+  msg.textContent = on ? '' : '请先启用 CloudDrive2 后再进行测试';
+  msg.style.display = on ? 'none' : 'block';
+  lbl.textContent = on ? '已启用' : '已禁用';
+}
+function toggleCd2(el) { syncCd2State(); }
+async function testClouddrive2() {
+  var body = cd2Body();
+  if (!body.host) { toast('请填写服务地址'); return; }
+  try { var j = await jsonPost('/api/clouddrive2/test', body); toast(j.ok ? ('连接成功：' + j.msg) : ('连接失败：' + (j.msg || ''))); }
+  catch (e) { toast('测试失败：' + e); }
+}
+function toggleCd2Creds(btn) {
+  var box = document.getElementById('cd2-creds');
+  var hide = box.style.display !== 'none';
+  box.style.display = hide ? 'none' : 'block';
+  btn.textContent = hide ? '获取 Token' : '收起';
+}
+async function getCd2Token() {
+  var user = v('cd2-user').trim(), pass = v('cd2-pass');
+  if (!user || !pass) { toast('请填写账号和密码'); return; }
+  toast('正在登录并获取 Token…');
+  try {
+    var j = await jsonPost('/api/clouddrive2/test', {host: v('cd2-host'), rpc_port: v('cd2-port'), timeout: v('cd2-timeout'), user_name: user, password: pass});
+    if (j.ok && j.token) { document.getElementById('cd2-token').value = j.token; toast('已获取 Token'); }
+    else toast('获取失败：' + (j.msg || ''));
+  } catch (e) { toast('获取失败：' + e); }
+}
+async function saveClouddrive2() {
+  try { var j = await jsonPost('/api/clouddrive2/config', cd2Body()); toast(j.ok ? 'CloudDrive2 配置已保存' : ('保存失败：' + (j.error || ''))); if (j.ok) setTimeout(function(){ location.reload(); }, 600); }
+  catch (e) { toast('保存失败：' + e); }
+}
+function reloadClouddrive2() { location.reload(); }
+syncCd2State();
+
+// —— 订阅配置（18.png） ——
+function subTimes(kind) {
+  var sel = kind === 'daily' ? 'sub-daily-chips' : 'sub-sync-chips';
+  return Array.prototype.map.call(document.querySelectorAll('#' + sel + ' .sub-time-chip'), function (el) {
+    return el.getAttribute('data-time') || '';
+  }).filter(Boolean);
+}
+function addSubTime(kind) {
+  var input = document.querySelector('.sub-time-input[data-kind="' + kind + '"]');
+  if (!input) return;
+  var v = (input.value || '').trim();
+  if (!v) { toast('请输入时间，如 08:00'); input.focus(); return; }
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(v)) { toast('时间格式应为 HH:MM，如 08:00'); input.focus(); return; }
+  addChip(kind, v);
+  input.value = '';
+  input.focus();
+}
+function addChip(kind, value) {
+  if (subTimes(kind).indexOf(value) !== -1) { toast('该时间已存在'); return; }
+  var container = document.getElementById(kind === 'daily' ? 'sub-daily-chips' : 'sub-sync-chips');
+  if (!container) return;
+  var chip = document.createElement('span');
+  chip.className = 'sub-time-chip';
+  chip.setAttribute('data-time', value);
+  chip.appendChild(document.createTextNode(value + ' '));
+  var x = document.createElement('a');
+  x.className = 'chip-x'; x.textContent = '×';
+  x.onclick = function (e) { e.preventDefault(); chip.remove(); };
+  chip.appendChild(x);
+  container.appendChild(chip);
+}
+function removeChip(event, el) {
+  event.preventDefault();
+  var chip = el.closest ? el.closest('.sub-time-chip') : null;
+  if (chip) chip.remove();
+}
+function subPill(btn) {
+  var on = btn.getAttribute('data-on') === '1';
+  btn.setAttribute('data-on', on ? '0' : '1');
+  btn.textContent = on ? '已禁用' : '已启用';
+  btn.classList.toggle('pill-on', !on);
+}
+function toggleSubPill(btn) { subPill(btn); }
+function syncSubPills() {
+  ['sub-check-pill', 'sub-sync-pill'].forEach(function (id) {
+    var b = document.getElementById(id);
+    if (!b) return;
+    var on = b.getAttribute('data-on') === '1';
+    b.textContent = on ? '已启用' : '已禁用';
+    b.classList.toggle('pill-on', on);
+  });
+}
+function subBody() {
+  return {
+    sub_check_enabled: document.getElementById('sub-check-pill').getAttribute('data-on') === '1',
+    sub_daily_times: subTimes('daily'),
+    sub_check_interval: Math.max(120, parseInt(v('sub-interval')) || 120),
+    sub_concurrency: parseInt(v('sub-conc')) || 0,
+    sub_interval_min: parseInt(v('sub-interval-min')),
+    sub_interval_max: parseInt(v('sub-interval-max')),
+    sub_timeout: parseInt(v('sub-timeout')) || 30,
+    sub_retry_enabled: document.getElementById('sub-retry').checked ? 1 : 0,
+    sub_sync_enabled: document.getElementById('sub-sync-pill').getAttribute('data-on') === '1',
+    sub_sync_times: subTimes('sync'),
+  };
+}
+async function saveSub() {
+  try {
+    var j = await jsonPost('/api/settings', subBody());
+    toast(j.ok ? '订阅配置已保存' : ('保存失败：' + (j.error || '')));
+    if (j.ok) setTimeout(function(){ location.reload(); }, 600);
+  } catch (e) { toast('保存失败：' + e); }
+}
+function reloadSub() { location.reload(); }
+syncSubPills();
+</script>
+{% endblock %}

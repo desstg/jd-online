@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}推送队列 · JD online{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>推送队列</h1>
+</div>
+{% if items %}
+<div class="detail-section">
+  <div style="overflow-x:auto;">
+    <table class="magnet-table">
+      <thead><tr><th>时间</th><th>番号</th><th>磁链</th><th>大小</th><th>状态</th><th></th></tr></thead>
+      <tbody>
+      {% for p in items %}
+      <tr>
+        <td>{{ (p['created_at'] or '')[:16] }}</td>
+        <td>{{ p['code'] or '—' }}</td>
+        <td class="magnet-name" title="{{ p['magnet'] }}">{{ p['name'] or p['magnet'][:50] }}</td>
+        <td>{{ p['size'] or '—' }}</td>
+        <td>
+          {% if p['status'] == 'pushed' %}<span class="badge">已推送</span>
+          {% elif p['status'] == 'failed' %}<span class="badge" style="background:rgba(220,38,38,.1);color:#dc2626">失败</span>
+          {% else %}<span class="badge" style="background:rgba(245,158,11,.1);color:#d97706">待推送</span>{% endif %}
+        </td>
+        <td>
+          <div style="display:flex;gap:0.4rem;">
+            {% if p['status'] != 'pushed' %}
+            <button class="copy-btn" onclick="repush({{ p['id'] }})">{{ icon('refresh', 12) }} 重推</button>
+            <button class="copy-btn" onclick="markPushed({{ p['id'] }})">{{ icon('check', 12) }} 标记已推送</button>
+            {% endif %}
+            <button class="copy-btn" style="color:#dc2626;border-color:#dc2626" onclick="delPush({{ p['id'] }})">{{ icon('trash', 12) }} 删除</button>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="empty-card">
+  {{ icon('send', 28) }}
+  <p>还没有推送记录，去磁链卡点「推送」试试。</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function jp(url, method, body) {
+  const r = await fetch(url, {method: method, headers: {'Content-Type': 'application/json'}, body: body ? JSON.stringify(body) : null});
+  return r.json();
+}
+async function repush(id) {
+  toast('正在重推…');
+  try {
+    const j = await jp('/api/push/' + id + '/repush', 'POST');
+    toast(j.ok ? ('重推成功：' + j.msg) : ('重推失败：' + (j.error || '')));
+    if (j.ok) setTimeout(function(){ location.reload(); }, 400);
+  } catch (e) { toast('重推失败：' + e); }
+}
+async function markPushed(id) {
+  try {
+    const j = await jp('/api/push/' + id + '/status', 'POST', {status: 'pushed'});
+    toast(j.ok ? '已标记' : ('失败：' + (j.error || '')));
+    if (j.ok) setTimeout(function(){ location.reload(); }, 400);
+  } catch (e) { toast('标记失败：' + e); }
+}
+async function delPush(id) {
+  if (!confirm('确认删除这条推送记录？')) return;
+  try {
+    const j = await jp('/api/push/' + id, 'DELETE');
+    toast(j.ok ? '已删除' : ('失败：' + (j.error || '')));
+    if (j.ok) setTimeout(function(){ location.reload(); }, 400);
+  } catch (e) { toast('删除失败：' + e); }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, videocard %}
+{% block title %}影库 · JD online{% endblock %}
+
+{% block content %}
+<div class="library-header">
+  <h1>影库 <span class="rank-count">{{ total }}</span></h1>
+</div>
+
+{% if movies %}
+<div class="video-grid">
+  {% for m in movies %}
+  {{ videocard(m, lib_codes) }}
+  {% endfor %}
+</div>
+
+{% if total_pages > 1 %}
+<div class="pagination">
+  {% if page > 1 %}<a class="page-btn" href="/library?page={{ page - 1 }}">← 上一页</a>
+  {% else %}<span class="page-btn disabled">← 上一页</span>{% endif %}
+  <span class="page-info">第 {{ page }} / {{ total_pages }} 页</span>
+  {% if page < total_pages %}<a class="page-btn" href="/library?page={{ page + 1 }}">下一页 →</a>
+  {% else %}<span class="page-btn disabled">下一页 →</span>{% endif %}
+</div>
+{% endif %}
+{% else %}
+<div class="empty-card">
+  {{ icon('film', 28) }}
+  <p>影库为空，去首页输入番号抓取影视入库吧。</p>
+</div>
+{% endif %}
+{% endblock %}

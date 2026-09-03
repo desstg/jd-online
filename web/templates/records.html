@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}下载记录 · JD online{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;justify-content:space-between;gap:0.8rem;flex-wrap:wrap;margin-bottom:1rem;">
+  <h1 style="margin:0;">下载记录</h1>
+  <a class="sub-btn" href="/records">{{ icon('refresh', 15) }} 刷新</a>
+</div>
+
+<form class="detail-section rec-filter" action="/records" method="get">
+  <div class="rec-grid" style="grid-template-columns:1fr 1fr 2fr;">
+    <div class="form-row">
+      <label>开始日期</label>
+      <input class="glass-input" type="date" name="from" value="{{ d1 }}">
+    </div>
+    <div class="form-row">
+      <label>结束日期</label>
+      <input class="glass-input" type="date" name="to" value="{{ d2 }}">
+    </div>
+    <div class="form-row">
+      <label>关键词</label>
+      <input class="glass-input" type="text" name="kw" value="{{ kw }}" placeholder="搜索番号、标题、资源名">
+    </div>
+  </div>
+  <div class="rec-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
+    <div class="form-row">
+      <label>资源类型</label>
+      <select class="glass-input" name="rtype">
+        <option value="">全部资源类型</option>
+        <option value="高清" {{ 'selected' if rtype == '高清' }}>高清</option>
+        <option value="破解" {{ 'selected' if rtype == '破解' }}>破解</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>下载器</label>
+      <select class="glass-input" name="downloader">
+        <option value="">全部下载器</option>
+        {% for o in dl_opts %}<option value="{{ o }}" {{ 'selected' if dl == o }}>{{ o }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="form-row">
+      <label>状态</label>
+      <select class="glass-input" name="status">
+        <option value="">全部状态</option>
+        <option value="pushed" {{ 'selected' if status == 'pushed' }}>已推送</option>
+        <option value="pending" {{ 'selected' if status == 'pending' }}>待推送</option>
+        <option value="failed" {{ 'selected' if status == 'failed' }}>失败</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>来源</label>
+      <select class="glass-input" name="source">
+        <option value="">全部来源</option>
+        <option value="手动" {{ 'selected' if source == '手动' }}>手动</option>
+      </select>
+    </div>
+  </div>
+  <div style="display:flex;gap:0.6rem;">
+    <button type="submit" class="glass-button">{{ icon('search', 15) }} 筛选</button>
+    <a class="glass-button ghost" href="/records">重置</a>
+  </div>
+</form>
+
+{% if records %}
+<div class="detail-section">
+  <div style="overflow-x:auto;">
+    <table class="magnet-table">
+      <thead><tr><th>状态</th><th>封面</th><th>影片</th><th>资源类型</th><th>下载时间</th><th>下载器</th><th></th></tr></thead>
+      <tbody>
+      {% for r in records %}
+      <tr>
+        <td>
+          {% if r['status'] == 'pushed' %}<span class="rec-status ok">✓</span>
+          {% elif r['status'] == 'failed' %}<span class="rec-status err">✕</span>
+          {% else %}<span class="rec-status pend">⟳</span>{% endif %}
+        </td>
+        <td>
+          {% if r['cover'] %}<img class="rec-cover" src="{{ imgproxy(r['cover']) }}" alt="">{% else %}<div class="rec-cover rec-cover-empty">无</div>{% endif %}
+        </td>
+        <td>
+          <div style="font-size:0.88rem;">{{ r['code'] or '—' }}</div>
+          <div class="rec-sub">{{ r['name'] or r['movie_title'] or r['magnet'][:50] }}</div>
+          {% if r['status'] == 'failed' %}<div class="rec-err">{{ r['movie_title'] }}: 115网盘: 错误: 任务已存在</div>{% endif %}
+        </td>
+        <td>
+          {% if r['hd'] %}<span class="badge">高清</span>{% endif %}
+          {% if r['uc'] %}<span class="mg-badge break">破解</span>{% endif %}
+        </td>
+        <td class="rec-sub">{{ r['time'] }}</td>
+        <td class="rec-sub">{{ r['downloader'] or '—' }}</td>
+        <td>
+          <button class="icon-btn-del" title="删除记录" onclick="delRecord({{ r['id'] }})">{{ icon('trash', 15) }}</button>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="empty-card">
+  {{ icon('film', 28) }}
+  <p>还没有下载记录，去磁链卡点「推送」试一下。</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function delRecord(id) {
+  if (!confirm('确认删除这条下载记录？')) return;
+  try {
+    const r = await fetch('/api/push/' + id, {method: 'DELETE'});
+    const j = await r.json();
+    toast(j.ok ? '已删除' : ('删除失败：' + (j.error || '')));
+    if (j.ok) setTimeout(function(){ location.reload(); }, 400);
+  } catch (e) { toast('删除失败：' + e); }
+}
+</script>
+{% endblock %}

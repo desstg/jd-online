@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}订阅管理 · JD online{% endblock %}
+
+{% block content %}
+<section class="want-page" data-want-page data-current-view="{{ view }}">
+  <div class="want-header">
+    <div>
+      <h1>订阅管理</h1>
+      <p>管理影片、在线来源、演员和清单订阅</p>
+    </div>
+    <div class="want-ops">
+      <button class="glass-button" type="button" id="want-ops-btn">{{ icon('settings', 15) }} 操作 <span class="want-ops-chev">{{ icon('chevron-down', 14) }}</span></button>
+      <div class="nav-menu want-ops-menu" id="want-ops-menu" style="display:none;">
+        <button type="button" class="nav-menu-item" data-want-create>{{ icon('plus', 15) }} 创建订阅</button>
+        <button type="button" class="nav-menu-item" data-op="run-all">{{ icon('play', 15) }} 执行操作</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="want-op-panel" class="want-op-panel" hidden>
+    <div class="want-op-panel-head">
+      <span>{{ icon('activity', 14) }} 操作进度</span>
+      <button class="icon-btn" type="button" id="want-op-panel-close" title="关闭">{{ icon('x', 14) }}</button>
+    </div>
+    <div class="want-op-panel-body" id="want-op-panel-body"></div>
+  </div>
+
+  <div class="want-toolbar" role="tablist" aria-label="想看内容分类">
+    {% for item in views %}
+    <button type="button" id="want-tab-{{ item.key }}"
+            class="want-tab {{ 'active' if item.key == view }}"
+            role="tab" data-want-view="{{ item.key }}"
+            aria-label="{{ item.label }}" aria-controls="want-panel"
+            aria-selected="{{ 'true' if item.key == view else 'false' }}"
+            tabindex="{{ '0' if item.key == view else '-1' }}"
+            title="{{ item.label }}">
+      <span class="want-tab-icon" aria-hidden="true">{{ icon(item.icon, 17) }}</span>
+      <span class="want-tab-label" aria-hidden="true">{{ item.label }}</span>
+      <span class="want-tab-count">{{ counts[item.key] }}</span>
+    </button>
+    {% endfor %}
+  </div>
+
+  <div id="want-panel" class="want-panel" role="tabpanel" aria-labelledby="want-tab-{{ view }}">
+    <div class="want-grid" data-want-list>
+      {% if items %}
+        {% if view == 'blacklist' %}
+          {% for item in items %}
+          <article class="want-card blacklist-card" data-blacklist-id="{{ item.id }}">
+            <div class="want-card-cover">
+              {% if item.cover %}<img src="{{ imgproxy(item.cover) }}" loading="lazy" alt="{{ item.target_name }}">{% else %}<div class="placeholder">无封面</div>{% endif %}
+              <div class="want-card-actions">
+                <button class="want-action-btn danger" type="button" data-blacklist-delete="{{ item.id }}" title="移出黑名单">{{ icon('trash', 15) }}</button>
+              </div>
+            </div>
+            <div class="want-card-content">
+              <div class="card-row"><span class="num-tag want-type-tag">{{ {'movie':'影片','actor':'演员','list':'清单'}.get(item.target_type, item.target_type) }}</span></div>
+              <div class="card-title">{{ item.target_name }}</div>
+              <div class="want-card-foot"><span class="want-foot-item">{{ icon('ban', 12) }} 黑名单</span><span class="want-foot-item">{{ icon('clock', 12) }} {{ (item.created_at or '')[:16].replace('T', ' ') }}</span></div>
+            </div>
+          </article>
+          {% endfor %}
+        {% else %}
+          {% for item in items %}
+          {% if item.kind == 'actor' %}
+          <article class="want-card actor-card" data-subscription-id="{{ item.id }}" data-actor-subscription="{{ item.id }}" data-actor-name="{{ item.target_name | e }}">
+            <span class="want-status-chip {{ item.status }}" title="订阅状态">{{ {'active':'订阅中','paused':'已暂停','completed':'已完成'}[item.status] }}</span>
+            <div class="want-card-actions">
+              <button class="want-action-btn" type="button" data-sub-check="{{ item.id }}" title="检查">{{ icon('refresh', 15) }}</button>
+              <button class="want-action-btn" type="button" data-sub-edit="{{ item.id }}" title="编辑">{{ icon('edit', 15) }}</button>
+              <button class="want-action-btn danger" type="button" data-sub-delete="{{ item.id }}" title="删除">{{ icon('trash', 15) }}</button>
+              {% if item.status == 'paused' %}<button class="want-action-btn" type="button" data-sub-action="activate" data-id="{{ item.id }}" title="恢复">{{ icon('play', 15) }}</button>
+              {% else %}<button class="want-action-btn" type="button" data-sub-action="pause" data-id="{{ item.id }}" title="暂停">{{ icon('pause', 15) }}</button>{% endif %}
+            </div>
+            <div class="actor-avatar">
+              {% if item.actor_avatar %}<img src="{{ imgproxy(item.actor_avatar) }}" loading="lazy" alt="{{ item.title }}">{% else %}{{ icon('user', 30) }}{% endif %}
+            </div>
+            <div class="actor-name">{{ item.title }}</div>
+            <div class="actor-meta">{{ item.type_label }} · 检 {{ item.matched_count or 0 }} · 推 {{ item.push_count }}</div>
+            <div class="actor-foot">{{ icon('clock', 12) }} {{ item.date_str }}</div>
+          </article>
+          {% elif item.kind == 'list' %}
+          <article class="want-card list-card" data-subscription-id="{{ item.id }}" data-movies-subscription="{{ item.id }}" data-movies-name="{{ item.target_name | e }}">
+            <span class="want-status-chip {{ item.status }}" title="订阅状态">{{ {'active':'订阅中','paused':'已暂停','completed':'已完成'}[item.status] }}</span>
+            <div class="want-card-actions">
+              <button class="want-action-btn" type="button" data-sub-check="{{ item.id }}" title="检查">{{ icon('refresh', 15) }}</button>
+              <button class="want-action-btn" type="button" data-sub-edit="{{ item.id }}" title="编辑">{{ icon('edit', 15) }}</button>
+              <button class="want-action-btn danger" type="button" data-sub-delete="{{ item.id }}" title="删除">{{ icon('trash', 15) }}</button>
+              {% if item.status == 'paused' %}<button class="want-action-btn" type="button" data-sub-action="activate" data-id="{{ item.id }}" title="恢复">{{ icon('play', 15) }}</button>
+              {% else %}<button class="want-action-btn" type="button" data-sub-action="pause" data-id="{{ item.id }}" title="暂停">{{ icon('pause', 15) }}</button>{% endif %}
+            </div>
+            <div class="list-logo">{{ item.list_logo or '清' }}</div>
+            <div class="list-name">{{ item.title }}</div>
+            <div class="list-meta"><span class="list-count">{{ icon('folder', 12) }} {{ item.matched_count or 0 }}</span></div>
+            <div class="list-foot">{{ icon('clock', 12) }} {{ item.date_str }}</div>
+            <div class="list-tags">{% for q in item.qualities %}<span class="q-badge {{ q }}">{{ {'hd':'高清','uhd':'超清','subtitle':'字幕','uncensored':'破解'}[q] }}</span>{% endfor %}</div>
+          </article>
+          {% else %}
+          <article class="want-card video-card" data-subscription-id="{{ item.id }}" {% if item.movie_url %}data-movie-url="{{ item.movie_url }}"{% endif %}>
+            <div class="want-card-cover card-cover">
+              {% if item.cover %}<img src="{{ imgproxy(item.cover) }}" loading="lazy" alt="{{ item.number or item.title }}">{% else %}<div class="placeholder">无封面</div>{% endif %}
+              <span class="want-status-chip {{ item.status }}" title="订阅状态">{{ {'active':'订阅中','paused':'已暂停','completed':'已完成'}[item.status] }}</span>
+              <div class="want-card-actions">
+                <button class="want-action-btn" type="button" data-sub-check="{{ item.id }}" title="检查">{{ icon('refresh', 15) }}</button>
+                <button class="want-action-btn" type="button" data-sub-edit="{{ item.id }}" title="编辑">{{ icon('edit', 15) }}</button>
+                <button class="want-action-btn danger" type="button" data-sub-delete="{{ item.id }}" title="删除">{{ icon('trash', 15) }}</button>
+                {% if item.status == 'paused' %}<button class="want-action-btn" type="button" data-sub-action="activate" data-id="{{ item.id }}" title="恢复">{{ icon('play', 15) }}</button>
+                {% else %}<button class="want-action-btn" type="button" data-sub-action="pause" data-id="{{ item.id }}" title="暂停">{{ icon('pause', 15) }}</button>{% endif %}
+              </div>
+            </div>
+            <div class="want-card-content card-content">
+              <div class="card-row">
+                {% if item.number %}<span class="num-tag">{{ item.number }}</span>{% else %}<span class="num-tag want-type-tag">{{ item.type_label }}</span>{% endif %}
+              </div>
+              <div class="card-title">{{ item.title }}</div>
+              <div class="want-card-foot">
+                <span class="want-foot-item {% if item.last_error %}error{% endif %}">{{ icon('clock', 12) }} {{ item.date_str }}</span>
+                <span class="want-foot-item" title="来源订阅">{{ item.source_name or ('检 ' ~ (item.matched_count or 0) ~ ' · 推 ' ~ item.push_count) }}</span>
+              </div>
+            </div>
+          </article>
+          {% endif %}
+          {% endfor %}
+        {% endif %}
+      {% else %}
+      <div class="empty-card want-empty" style="grid-column:1/-1;">
+        {{ icon((views | selectattr('key', 'equalto', view) | first).icon, 30) }}
+        <h3>{{ {'pending':'暂无订阅中的内容','completed':'暂无已完成的订阅','online':'暂无在线订阅','actors':'暂无演员订阅','lists':'暂无清单订阅','blacklist':'黑名单为空'}[view] }}</h3>
+        <p>创建或管理的内容将显示在这里。</p>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if total_pages > 1 %}
+    <div class="pagination">
+      {% if page > 1 %}<a class="page-btn" href="/want?view={{ view }}&page={{ page - 1 }}">← 上一页</a>{% else %}<span class="page-btn disabled">← 上一页</span>{% endif %}
+      <span class="page-info">第 {{ page }} / {{ total_pages }} 页</span>
+      {% if page < total_pages %}<a class="page-btn" href="/want?view={{ view }}&page={{ page + 1 }}">下一页 →</a>{% else %}<span class="page-btn disabled">下一页 →</span>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<div class="modal-overlay want-modal-overlay" id="want-actor-movies-modal" hidden>
+  <div class="modal want-actor-movies-modal" role="dialog" aria-modal="true" aria-labelledby="want-actor-movies-title">
+    <div class="modal-header">
+      <div><h2 id="want-actor-movies-title">演员的影片</h2><p id="want-actor-movies-sub">全部符合条件的影片</p></div>
+      <button class="icon-btn" type="button" data-actor-movies-close>{{ icon('x', 16) }}</button>
+    </div>
+    <div class="want-actor-movies-head">
+      <div class="want-actor-tabs" id="want-actor-tabs"></div>
+      <div class="want-actor-op">
+        <button type="button" class="toolbar-btn" id="want-actor-op-btn">{{ icon('settings', 14) }} 操作 {{ icon('chevron-down', 13) }}</button>
+        <div class="nav-menu" id="want-actor-op-menu" style="display:none;">
+          <button type="button" class="nav-menu-item" data-actor-op="subscribe">执行订阅</button>
+          <button type="button" class="nav-menu-item" data-actor-op="check">全部检查</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-body want-actor-movies-scroll" id="want-actor-movies-scroll">
+      <div class="want-movies-grid" id="want-actor-movies-grid"></div>
+    </div>
+    <div class="modal-footer"><button class="glass-button ghost" type="button" data-actor-movies-close>关闭</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay want-modal-overlay" id="want-check-modal" hidden>
+  <div class="modal want-check-modal" role="dialog" aria-modal="true" aria-labelledby="want-check-title">
+    <div class="modal-header"><div><h2 id="want-check-title">检查结果</h2><p>按“高清 → 破解 → 文件大小”排序</p></div><button class="icon-btn" type="button" data-check-modal-close>{{ icon('x', 16) }}</button></div>
+    <div class="modal-body" id="want-check-results"></div>
+    <div class="modal-footer"><button class="glass-button ghost" type="button" data-check-modal-close>关闭</button></div>
+  </div>
+</div>
+{% endblock %}

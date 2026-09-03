@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JD online | 登录</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-brand"><span class="brand-accent">JD</span> online</div>
+      <div class="login-sub">JAVDB 媒体管理中心</div>
+
+      {% if error %}<div class="login-error">{{ error }}</div>{% endif %}
+
+      <form method="post" action="/login{{ '?next=' ~ next if next }}">
+        <div class="login-field">
+          <label>▸ 用户名</label>
+          <input class="glass-input" style="width:100%" type="text" name="username" placeholder="请输入用户名" autocomplete="username" autofocus required>
+        </div>
+        <div class="login-field">
+          <label>▸ 密码</label>
+          <input class="glass-input" style="width:100%" type="password" name="password" placeholder="请输入密码" autocomplete="current-password" required>
+        </div>
+        <button class="glass-button login-btn" type="submit">登 录</button>
+      </form>
+
+      <div class="login-meta">v1.0.0</div>
+    </div>
+  </div>
+</body>
+</html>

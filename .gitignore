@@ -1,0 +1,31 @@
+# 私密 / 运行数据：绝不上传
+config.json
+javdb.db
+*.log
+.webapp.log
+
+# 缓存 / Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 本地会话 / 工具
+.claude/
+.playwright-mcp/
+
+# 原型 / 参考图（不进公开仓库）
+*.jpg
+*.jpeg
+*.png
+
+# 外部协议参考（上游 schema）
+clouddrive.proto
+
+# 测试
+test_subscriptions.py
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

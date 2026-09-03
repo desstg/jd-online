@@ -1,0 +1,31 @@
+# -------- 凭据与私有数据：绝不打进镜像 / 不进入构建上下文 --------
+config.json
+config.example.json
+javdb.db
+webapp.log
+*.log
+
+# -------- 本地开发 / 缓存 / 测试 --------
+__pycache__/
+*.pyc
+.claude/
+.playwright-mcp/
+test_subscriptions.py
+test_*.py
+
+# -------- 占空间的资源（参考图/原型/模板）--------
+*.jpg
+*.jpeg
+*.png
+*.proto
+
+# -------- 文档 / 版本控制（不进镜像）--------
+*.md
+.git/
+.gitignore
+README.md
+
+# -------- 容器文件（不递归包含自身）--------
+Dockerfile
+docker-compose.yml
+.dockerignore

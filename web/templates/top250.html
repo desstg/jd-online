@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}排行榜 · JD online{% endblock %}
+
+{% block content %}
+<div class="rank-header">
+  <div class="rank-title">排行榜 <span class="rank-count">{{ count }}</span></div>
+  <button class="rank-sub-btn" onclick="toast('已开启自动订阅')">{{ icon('bell', 15) }} 自动订阅</button>
+</div>
+
+<div class="rank-filters">
+  <div class="rank-tabs">
+    <a class="rank-tab {{ 'active' if tab == 'top250' }}" href="/top250?tab=top250">{{ icon('trophy', 16) }} Top250</a>
+    <a class="rank-tab {{ 'active' if tab == 'daily' }}" href="/top250?tab=daily">{{ icon('sun', 16) }} 日榜</a>
+    <a class="rank-tab {{ 'active' if tab == 'weekly' }}" href="/top250?tab=weekly">{{ icon('calendar', 16) }} 周榜</a>
+    <a class="rank-tab {{ 'active' if tab == 'monthly' }}" href="/top250?tab=monthly">{{ icon('calendar', 16) }} 月榜</a>
+    <a class="rank-tab {{ 'active' if tab == 'actor' }}" href="/top250?tab=actor">{{ icon('user', 16) }} 演员榜</a>
+  </div>
+</div>
+
+{% if error %}
+<div class="empty-card">
+  {{ icon('star', 28) }}
+  <p>排行榜获取失败：{{ error }}</p>
+  <p style="margin-top:0.5rem;">请先在「设置」页填写 JAVDB 账号并登录获取 Token。</p>
+</div>
+{% elif tab == 'actor' %}
+{% if actors %}
+<div class="actor-rank-grid">
+  {% for a in actors %}
+  <a class="actor-rank-card" href="/search?type=actor&q={{ (a['name'] or '') | urlencode }}">
+    <span class="rank-num {{ 'r1' if loop.index == 1 else 'r2' if loop.index == 2 else 'r3' if loop.index == 3 else 'rn' }}">{{ loop.index }}</span>
+    <button class="actor-sub-btn" type="button" data-subscribe-actor data-target-id="{{ a['id'] }}" data-target-name="{{ a['name'] }}" onclick="event.preventDefault(); event.stopPropagation();">{{ icon('heart', 13) }}<span class="actor-sub-label">订阅</span></button>
+    <div class="actor-rank-avatar">
+      {% if a['avatar_url'] %}<img src="{{ imgproxy(a['avatar_url']) }}" loading="lazy" alt="{{ a['name'] }}">{% else %}{{ icon('user', 30) }}{% endif %}
+    </div>
+    <div class="actor-rank-name">{{ a['name'] }}</div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-card">{{ icon('user', 28) }}<p>演员榜获取失败：{{ error or '暂无数据' }}</p></div>
+{% endif %}
+{% elif movies %}
+<div class="rank-grid">
+  {% for m in movies %}
+  <a class="rank-card" href="/movie/{{ m['id'] }}">
+    <div class="rank-cover">
+      {% set cov = m['cover_url'] or m['thumb_url'] %}
+      {% if cov %}<img src="{{ imgproxy(cov) }}" loading="lazy" alt="{{ m['number'] or m['id'] }}">{% else %}<div class="placeholder">无封面</div>{% endif %}
+      <span class="card-sub" role="button" data-subscribe-target data-target-type="movie" data-target-id="{{ m['id'] }}" data-target-name="{{ (m['number'] or m['title'] or m['id']) | e }}" onclick="event.preventDefault(); event.stopPropagation();">{{ icon('heart', 12) }}<span class="card-sub-label">订阅</span></span>
+      <div class="rank-overlays">
+        {% if m['magnets_count'] %}<span class="rank-chip">{{ icon('link', 12) }} {{ m['magnets_count'] }}</span>{% endif %}
+        {% if m['duration'] %}<span class="rank-chip">{{ icon('clock', 12) }} {{ m['duration'] }}分钟</span>{% endif %}
+      </div>
+      {% if lib_codes %}
+      <span class="rank-flag {{ 'missing' if (m['number'] or '') not in lib_codes else '' }}">{{ '已入库' if (m['number'] or '') in lib_codes else '未入库' }}</span>
+      {% endif %}
+      {% set r = m['ranking'] or loop.index %}
+      <span class="rank-num {{ 'r1' if r == 1 else 'r2' if r == 2 else 'r3' if r == 3 else 'rn' }}">{{ r }}</span>
+    </div>
+    <div class="rank-info">
+      <div class="rank-meta">
+        {% if m['number'] %}<span class="rank-number">{{ m['number'] }}</span>{% endif %}
+        {% if m['release_date'] %}<span class="rank-date">{{ m['release_date'] }}</span>{% endif %}
+      </div>
+      <div class="rank-desc">{{ m['title'] or m['origin_title'] or '（无标题）' }}</div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% if total_pages > 1 %}
+<div class="pagination rank-pagination">
+  {% set base = '/top250?tab=' ~ tab %}
+  {% if page > 1 %}<a class="page-btn" href="{{ base }}&page={{ page - 1 }}">← 上一页</a>
+  {% else %}<span class="page-btn disabled">← 上一页</span>{% endif %}
+  <div class="page-numbers" aria-label="分页">
+    {% for p in range(1, total_pages + 1) %}
+    <a class="page-number {{ 'active' if p == page }}" href="{{ base }}&page={{ p }}">{{ p }}</a>
+    {% endfor %}
+  </div>
+  <span class="page-info">第 {{ page }} / {{ total_pages }} 页</span>
+  {% if page < total_pages %}<a class="page-btn" href="{{ base }}&page={{ page + 1 }}">下一页 →</a>
+  {% else %}<span class="page-btn disabled">下一页 →</span>{% endif %}
+  <form class="page-jump" action="/top250" method="get">
+    <input type="hidden" name="tab" value="{{ tab }}">
+    <label for="rank-page-jump">跳转到</label>
+    <input id="rank-page-jump" name="page" type="number" min="1" max="{{ total_pages }}" value="{{ page }}" aria-label="跳转页码">
+    <button type="submit">页</button>
+  </form>
+</div>
+{% endif %}
+{% else %}
+<div class="empty-card">
+  {{ icon('star', 28) }}
+  <p>暂无数据。</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,16 @@
+{
+  "web_username": "123",
+  "web_password": "abc123",
+  "secret_key": "",
+  "javdb_username": "",
+  "javdb_password": "",
+  "javdb_token": "",
+  "proxy": "",
+  "image_route": "auto",
+  "api_base": "https://jdforrepam.com/api",
+  "javbus_base": "https://www.javbus.com",
+  "min_interval": 0.5,
+  "db_path": "javdb.db",
+  "port": 9091,
+  "host": "0.0.0.0"
+}

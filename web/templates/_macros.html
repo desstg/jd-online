@@ -1,0 +1,90 @@
+{# 内联 SVG 图标（lucide 风格，stroke 渲染，无外部依赖） #}
+{% macro icon(name, size=16) -%}
+<svg xmlns="http://www.w3.org/2000/svg" width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+{%- if name == 'search' %}<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+{%- elif name == 'home' %}<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+{%- elif name == 'settings' %}<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>
+{%- elif name == 'film' %}<rect x="2" y="2" width="20" height="20" rx="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/>
+{%- elif name == 'folder' %}<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>
+{%- elif name == 'star' %}<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+{%- elif name == 'clock' %}<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+{%- elif name == 'copy' %}<rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+{%- elif name == 'link' %}<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+{%- elif name == 'refresh' %}<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/>
+{%- elif name == 'plus' %}<path d="M5 12h14"/><path d="M12 5v14"/>
+{%- elif name == 'trash' %}<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+{%- elif name == 'play' %}<polygon points="6 3 20 12 6 21 6 3"/>
+{%- elif name == 'pause' %}<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>
+{%- elif name == 'heart' %}<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+{%- elif name == 'logout' %}<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+{%- elif name == 'list' %}<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+{%- elif name == 'check' %}<polyline points="20 6 9 17 4 12"/>
+{%- elif name == 'x' %}<path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+{%- elif name == 'external' %}<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+{%- elif name == 'expand' %}<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
+{%- elif name == 'volume' %}<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+{%- elif name == 'mute' %}<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>
+{%- elif name == 'database' %}<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>
+{%- elif name == 'download' %}<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+{%- elif name == 'cloud' %}<path d="M17.5 19a4.5 4.5 0 1 0-.42-8.98 6 6 0 1 0-11.15 2.06A3.5 3.5 0 0 0 6.5 19h11z"/>
+{%- elif name == 'save' %}<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+{%- elif name == 'activity' %}<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+{%- elif name == 'user' %}<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+{%- elif name == 'key' %}<path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+{%- elif name == 'server' %}<rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
+{%- elif name == 'image' %}<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
+{%- elif name == 'globe' %}<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+{%- elif name == 'hash' %}<line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/>
+{%- elif name == 'chevron-down' %}<polyline points="6 9 12 15 18 9"/>
+{%- elif name == 'chevron-right' %}<polyline points="9 6 15 12 9 18"/>
+{%- elif name == 'chevron-left' %}<polyline points="15 18 9 12 15 6"/>
+{%- elif name == 'check-circle' %}<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+{%- elif name == 'ban' %}<circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>
+{%- elif name == 'edit' %}<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+{%- elif name == 'upload' %}<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+{%- elif name == 'bell' %}<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+{%- elif name == 'info' %}<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
+{%- elif name == 'trophy' %}<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>
+{%- elif name == 'sun' %}<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
+{%- elif name == 'calendar' %}<rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+{%- elif name == 'send' %}<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>
+{%- elif name == 'share' %}<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+{%- elif name == 'dots' %}<circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/>
+{%- elif name == 'eye' %}<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
+{%- elif name == 'eye-off' %}<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/>
+{%- endif %}</svg>
+{%- endmacro %}
+
+{# 五星评分：按 0-5 分数填满对应星数 #}
+{% macro stars(score=0) -%}
+{%- set full = ((score or 0) | round) | int -%}
+{%- if full > 5 %}{% set full = 5 %}{% endif -%}
+{%- if full < 0 %}{% set full = 0 %}{% endif -%}
+{%- for i in range(5) -%}<svg class="star {{ 'on' if i < full else '' }}" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>{%- endfor -%}
+{%- endmacro %}
+
+{# 视频卡片：封面叠加订阅/磁链/时长，底部番号+日期+标题 #}
+{% macro videocard(m, lib_codes=None, show_flag=False) -%}
+<a class="video-card" href="/movie/{{ m['id'] }}">
+  <div class="card-cover">
+    {% set cov = m['cover_url'] or m['javbus_cover'] or m['thumb_url'] %}
+    {% if cov %}<img src="{{ imgproxy(cov) }}" loading="lazy" alt="{{ m['number'] or m['id'] }}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">{% endif %}
+    <div class="placeholder" style="{{ 'display:none' if cov else 'display:flex' }}">无封面</div>
+    <button class="card-sub" data-subscribe-target data-target-type="movie" data-target-id="{{ m['id'] }}" data-target-name="{{ (m['number'] or m['title'] or m['id']) | e }}" onclick="event.preventDefault(); event.stopPropagation();">{{ icon('heart', 12) }}<span class="card-sub-label">订阅</span></button>
+    {% if lib_codes %}
+    <span class="card-flag {{ 'missing' if (m['number'] or '') not in lib_codes else '' }}">{{ '已入库' if (m['number'] or '') in lib_codes else '未入库' }}</span>
+    {% endif %}
+    <div class="card-overlays">
+      {% if m['magnets_count'] %}<span class="card-chip teal">{{ icon('link', 12) }} {{ m['magnets_count'] }}</span>{% endif %}
+      {% if m['duration'] %}<span class="card-chip dark">{{ icon('clock', 12) }} {{ m['duration'] }}分钟</span>{% endif %}
+    </div>
+  </div>
+  <div class="card-content">
+    <div class="card-row">
+      <span class="num-tag">{{ m['number'] or m['id'] }}</span>
+      {% if m['release_date'] %}<span class="card-date">{{ m['release_date'] }}</span>{% endif %}
+    </div>
+    <div class="card-title">{{ m['title'] or m['origin_title'] or '（无标题）' }}</div>
+  </div>
+</a>
+{%- endmacro %}

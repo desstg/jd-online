@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}关注 · JD online{% endblock %}
+
+{% block content %}
+<section class="follow-page">
+  <div class="want-header">
+    <div>
+      <h1>关注</h1>
+      <p>我关注的分享者，点击卡片可查看 TA 分享的所有影片</p>
+    </div>
+  </div>
+
+  <div class="want-panel">
+    <div class="want-grid follow-grid">
+      {% if empty %}
+      <div class="empty-card want-empty" style="grid-column:1/-1;">
+        {{ icon('user', 30) }}
+        <h3>暂无关注的内容</h3>
+        <p>在评论区点击分享者的「关注」，TA 会显示在这里。</p>
+      </div>
+      {% else %}
+      {% for u in users %}
+      <article class="want-card list-card follow-card"
+               data-sharer-id="{{ u['user_id'] }}"
+               data-sharer="{{ (u['username'] or '分享者') | e }}"
+               title="查看 {{ u['username'] or '该分享者' }} 的分享">
+        <div class="want-card-actions">
+          <button class="want-action-btn danger" type="button" data-unfollow="{{ u['user_id'] }}" data-name="{{ (u['username'] or '') | e }}" title="取消关注">{{ icon('x', 14) }}</button>
+        </div>
+        <div class="list-logo follow-logo">{{ (u['username'] or '分')[:1] }}</div>
+        <div class="list-name follow-name">{{ u['username'] or '分享者' }}</div>
+        <div class="list-meta"><span class="list-count">{{ icon('film', 12) }} {{ u['share_count'] or 0 }} 部</span></div>
+        <div class="list-foot">{{ icon('clock', 12) }} {{ (u['created_at'] or '')[:16].replace('T', ' ') }}</div>
+      </article>
+      {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  // 关注页：点卡片打开全局分享者弹窗（详情页/关注页共用 openSharerModal）
+  document.querySelectorAll('.follow-card[data-sharer-id]').forEach(function (card) {
+    card.addEventListener('click', function (e) {
+      if (e.target.closest('[data-unfollow]')) return;
+      window.openSharerModal && openSharerModal(
+        card.getAttribute('data-sharer-id'),
+        card.getAttribute('data-sharer')
+      );
+    });
+  });
+  // 取消关注
+  document.querySelectorAll('[data-unfollow]').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var uid = btn.getAttribute('data-unfollow');
+      var name = btn.getAttribute('data-name') || '该分享者';
+      if (!window.confirm('取消关注 ' + name + ' ？')) return;
+      fetch('/api/user/' + encodeURIComponent(uid) + '/unfollow', {method: 'POST'})
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          if (j.ok) { toast('已取消关注 ' + name); setTimeout(function () { location.reload(); }, 400); }
+          else { toast('操作失败：' + (j.error || '未知错误')); }
+        })
+        .catch(function (err) { toast('操作失败：' + err); });
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, videocard %}
+{% block title %}{{ name or '清单' }} · JD online{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;justify-content:space-between;gap:0.8rem;flex-wrap:wrap;margin-bottom:1rem;">
+  <h1 style="margin:0;">{% if name %}清单：{{ name }}{% if total %}（共 {{ total }} 部）{% endif %}{% else %}清单{% endif %}</h1>
+  <div class="page-header-actions" style="display:flex;gap:0.6rem;align-items:center;">
+    {% if name %}<button class="outline-btn" type="button" data-subscribe-target data-target-type="list" data-target-id="{{ list_id }}" data-target-name="{{ name | e }}">{{ icon('bell', 15) }}<span class="card-sub-label">订阅清单</span></button>{% endif %}
+  </div>
+</div>
+
+<div class="search-filter">
+  <select class="filter-sel" onchange="goList()" name="filter" title="筛选">
+    <option value="all" {{ 'selected' if filter_ == 'all' }}>筛选 全部</option>
+    <option value="censored" {{ 'selected' if filter_ == 'censored' }}>有码</option>
+    <option value="uncensored" {{ 'selected' if filter_ == 'uncensored' }}>无码</option>
+    <option value="european" {{ 'selected' if filter_ == 'european' }}>欧美</option>
+    <option value="fc2" {{ 'selected' if filter_ == 'fc2' }}>FC2</option>
+  </select>
+
+  <select class="filter-sel" onchange="goList()" name="year" title="年份">
+    <option value="" {{ 'selected' if not year }}>年份 全部</option>
+    {% for y in range(2026, 1999, -1) %}
+    <option value="{{ y }}" {{ 'selected' if year == (y|string) }}>{{ y }}</option>
+    {% endfor %}
+  </select>
+
+  <select class="filter-sel" onchange="goList()" name="sort" title="排序">
+    <option value="release_date" {{ 'selected' if sort == 'release_date' }}>排序 上映日期</option>
+    <option value="score" {{ 'selected' if sort == 'score' }}>排序 评分</option>
+    <option value="relevance" {{ 'selected' if sort == 'relevance' }}>排序 相关度</option>
+  </select>
+</div>
+
+{% if error %}
+<div class="empty-card">
+  {{ icon('folder', 28) }}
+  <p>清单获取失败：{{ error }}</p>
+</div>
+{% elif movies %}
+<div class="video-grid">
+  {% for m in movies %}
+  {{ videocard(m, lib_codes) }}
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-card">
+  {{ icon('folder', 28) }}
+  <p>暂无影片。</p>
+</div>
+{% endif %}
+
+{% if movies and total_pages and total_pages > 1 %}
+<div class="pagination rank-pagination">
+  {% set base = '/list/' ~ list_id ~ '?filter=' ~ filter_ ~ '&year=' ~ year ~ '&sort=' ~ sort %}
+  {% if page > 1 %}<a class="page-btn" href="{{ base }}&page={{ page - 1 }}">← 上一页</a>
+  {% else %}<span class="page-btn disabled">← 上一页</span>{% endif %}
+  <div class="page-numbers" aria-label="分页">
+    {% for p in range(1, total_pages + 1) %}
+    <a class="page-number {{ 'active' if p == page }}" href="{{ base }}&page={{ p }}">{{ p }}</a>
+    {% endfor %}
+  </div>
+  <span class="page-info">第 {{ page }} / {{ total_pages }} 页</span>
+  {% if page < total_pages %}<a class="page-btn" href="{{ base }}&page={{ page + 1 }}">下一页 →</a>
+  {% else %}<span class="page-btn disabled">下一页 →</span>{% endif %}
+  <form class="page-jump" action="/list/{{ list_id }}" method="get">
+    <input type="hidden" name="filter" value="{{ filter_ }}">
+    <input type="hidden" name="year" value="{{ year }}">
+    <input type="hidden" name="sort" value="{{ sort }}">
+    <label for="list-page-jump">跳转到</label>
+    <input id="list-page-jump" name="page" type="number" min="1" max="{{ total_pages }}" value="{{ page }}" aria-label="跳转页码">
+    <button type="submit">页</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function goList() {
+  var f = document.querySelector('.search-filter');
+  var filter = f.querySelector('[name=filter]').value;
+  var year = f.querySelector('[name=year]').value;
+  var sort = f.querySelector('[name=sort]').value;
+  window.location.href = '/list/{{ list_id }}?filter=' + encodeURIComponent(filter) +
+            '&year=' + encodeURIComponent(year) + '&sort=' + encodeURIComponent(sort);
+}
+</script>
+{% endblock %}

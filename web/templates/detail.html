@@ -1,0 +1,633 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, stars %}
+{% block title %}{{ movie['number'] or movie['id'] }} · JD online{% endblock %}
+
+{% block content %}
+<h1 class="detail-title">{{ movie['title'] or movie['origin_title'] or '（无标题）' }}</h1>
+
+<div class="detail-meta-bar">
+  <div class="meta-left">
+    <span class="num-tag">{{ movie['number'] or movie['id'] }}</span>
+    {% if movie['can_play'] %}<span class="badge online-badge">在线</span>{% endif %}
+    {% if movie['has_cnsub'] %}<span class="badge">中字</span>{% endif %}
+    {% if movie['release_date'] %}<span class="meta-item">{{ movie['release_date'] }}</span>{% endif %}
+    {% if movie['duration'] %}<span class="meta-item">{{ movie['duration'] }} 分钟</span>{% endif %}
+    {% if hits %}<span class="lib-badge">{{ icon('check', 15) }} 已入库</span>{% else %}<span class="lib-badge missing">{{ icon('x', 15) }} 未入库</span>{% endif %}
+  </div>
+  <div class="meta-right">
+    <button class="sub-btn" onclick="doAction('/api/ingest', {target: '{{ movie['id'] }}'}, '重新获取详细')">{{ icon('refresh', 15) }} 重新获取</button>
+    <button class="sub-btn" data-subscribe-target data-target-type="movie" data-target-id="{{ movie['id'] }}" data-target-name="{{ (movie['number'] or movie['title'] or movie['id']) | e }}">{{ icon('heart', 15) }}<span class="card-sub-label">订阅</span></button>
+  </div>
+</div>
+
+<div class="detail-layout">
+  <div class="detail-left">
+    <div class="detail-cover" id="detail-cover">
+      {% set cov = movie['cover_url'] or movie['javbus_cover'] %}
+      {% if cov %}<img id="cover-img" src="{{ imgproxy(cov) }}" alt="{{ movie['number'] }}">{% else %}<div class="placeholder" style="aspect-ratio:3/2;display:flex;align-items:center;justify-content:center;color:var(--text-muted)">无封面</div>{% endif %}
+
+      <!-- 播放键（封面中央；精确位置等参考图后调） -->
+      <button class="detail-play-btn" id="detail-play-btn" title="播放" onclick="openPlayer()">{{ icon('play', 30) }}</button>
+
+      <!-- 播放态工具条（就地覆盖在视频上） -->
+      <div class="detail-player-bar" id="detail-player-bar" hidden>
+        <span class="player-mode-label" id="player-label"></span>
+        <span class="player-bar-grow"></span>
+        <button class="player-bar-btn" id="player-ext-toggle" title="用电脑播放器" onclick="toggleExtMenu()">{{ icon('external', 15) }}</button>
+        <button class="player-bar-btn" id="player-fullscreen" title="全屏" onclick="toggleFullscreen()">{{ icon('expand', 15) }}</button>
+        <button class="player-bar-btn danger" id="player-close" title="关闭" onclick="closePlayer()">{{ icon('x', 15) }}</button>
+        <div class="player-ext-menu" id="player-ext-menu" hidden></div>
+      </div>
+
+      <!-- 播放控制条（底部）：进度条/时间/播放暂停/音量 -->
+      <div class="player-control" id="player-control" hidden>
+        <button class="pc-btn" id="pc-playpause" title="播放/暂停" onclick="togglePlayPause()">{{ icon('pause', 16) }}</button>
+        <div class="pc-seek" id="pc-seek" title="进度">
+          <div class="pc-seek-buffer" id="pc-buffer"></div>
+          <div class="pc-seek-done" id="pc-done"></div>
+          <div class="pc-seek-thumb" id="pc-thumb"></div>
+        </div>
+        <span class="pc-time" id="pc-time">0:00 / 0:00</span>
+        <button class="pc-btn" id="pc-mute" title="静音" onclick="toggleMute()">{{ icon('volume', 16) }}</button>
+        <div class="pc-vol" id="pc-vol" title="音量">
+          <div class="pc-vol-done" id="pc-vol-done"></div>
+          <div class="pc-vol-thumb" id="pc-vol-thumb"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <div class="dbs-card-title">{{ icon('user') }} 演员{% if actors %}（{{ actors|length }}）{% endif %}</div>
+      {% if actors %}
+      <div class="actor-chips">
+        {% for a in actors %}
+        <a class="actor-chip" href="/search?type=actor&q={{ a['name'] | urlencode }}">
+          <span style="position:relative;display:inline-flex;width:26px;height:26px;align-items:center;justify-content:center;color:var(--text-muted)">
+            {{ icon('user', 20) }}
+            {% if a['avatar_url'] %}<img src="{{ imgproxy(a['avatar_url']) }}" loading="lazy" alt="{{ a['name'] }}" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover">{% endif %}
+          </span>
+          <span>{{ a['name'] }}</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% elif fetching_detail %}
+      <div class="loading-hint"><span class="spinner"></span>正在加载完整详情...</div>
+      {% else %}
+      <div class="empty-hint">暂无演员。</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="detail-main">
+    <div class="detail-section info-card">
+      <div class="dbs-card-title">信息</div>
+      <div class="info-rows">
+        <div class="info-row"><span class="info-label">导演</span><span class="info-value">{{ movie['director_name'] or '—' }}</span></div>
+        <div class="info-row"><span class="info-label">片商</span><span class="info-value">{{ movie['maker_name'] or '—' }}</span></div>
+        <div class="info-row"><span class="info-label">发行商</span><span class="info-value">{{ movie['publisher_name'] or '—' }}</span></div>
+        <div class="info-row"><span class="info-label">系列</span><span class="info-value">{{ movie['series_name'] or '—' }}</span></div>
+        <div class="info-row">
+          <span class="info-label">众评</span>
+          <span class="info-value stars-wrap green">{{ stars(movie['score']) }}{% if movie['score'] %}<b class="score-num">{{ movie['score'] }}</b>{% endif %}<em class="score-count">{{ movie['reviews_count'] or 0 }}人评分</em></span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">评分</span>
+          <span class="info-value stars-wrap gray">{{ stars(movie['score']) }}{% if movie['score'] %}<b class="score-num">{{ movie['score'] }}</b>{% endif %}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <div class="dbs-card-title">{{ icon('folder') }} 类别</div>
+      {% if movie['tags_list'] %}
+      <div class="tag-chips">
+        {% for t in movie['tags_list'] %}<span class="tag-chip">{{ t }}</span>{% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-hint">暂无标签。</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if movie['summary'] %}
+<div class="detail-section detail-full">
+  <div class="dbs-card-title">{{ icon('film') }} 简介</div>
+  <div class="summary-text">{{ movie['summary'] }}</div>
+</div>
+{% endif %}
+
+{% if movie['preview_list'] %}
+<div class="detail-section detail-full">
+  <div class="dbs-card-title">{{ icon('image') }} 预览图 <span class="count-badge">{{ movie['preview_list']|length }}</span></div>
+  <div class="preview-grid" id="preview-grid">
+    {% for p in movie['preview_list'] %}
+    <img src="{{ imgproxy(p['large']) }}" loading="lazy" onclick="openLightbox({{ loop.index0 }})" title="点击查看大图">
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if relative_movies %}
+<div class="detail-section detail-full">
+  <div class="dbs-card-title">{{ icon('film') }} 关联影片 <span class="count-badge">{{ relative_movies|length }}</span></div>
+  <div class="rel-carousel">
+    <button class="carousel-nav prev" onclick="scrollRel(-1)" title="上一组">‹</button>
+    <div class="rel-track" id="rel-track">
+      {% for r in relative_movies %}
+      <a class="rel-movie" href="/movie/{{ r['id'] }}">
+        <div class="rel-movie-cover">
+          {% if r['thumb'] %}<img src="{{ imgproxy(r['thumb']) }}" loading="lazy" alt="{{ r['number'] }}">{% else %}<div class="placeholder">无封面</div>{% endif %}
+          <span class="rel-movie-num">{{ r['number'] }}</span>
+          {% if lib_codes %}<span class="rel-flag {{ 'missing' if (r['number'] or '') not in lib_codes else '' }}">{{ '已入库' if (r['number'] or '') in lib_codes else '未入库' }}</span>{% endif %}
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    <button class="carousel-nav next" onclick="scrollRel(1)" title="下一组">›</button>
+  </div>
+</div>
+{% endif %}
+
+<div class="detail-section detail-full">
+  <div class="tab-header">
+    <button type="button" class="tab-btn active" data-tab="magnets" onclick="switchTab('magnets')">{{ icon('link', 15) }} 磁力链接（{{ magnets|length }}）</button>
+    <button type="button" class="tab-btn" data-tab="ed2k" onclick="switchTab('ed2k')">{{ icon('share', 15) }} 评论区分享（{{ comment_magnets|length }}）</button>
+    <button type="button" class="tab-btn" data-tab="related" onclick="switchTab('related')">{{ icon('folder', 15) }} 关联清单（{{ related_lists|length }}）</button>
+    <button type="button" class="tab-btn" data-tab="reviews" onclick="switchTab('reviews')">{{ icon('list', 15) }} 评论（{{ total_reviews }}）</button>
+  </div>
+
+  <div class="tab-panel" id="tab-magnets">
+    {% if magnets %}
+    {% for mg in magnets %}
+    <div class="magnet-card">
+      <div class="mg-top">
+        <span class="mg-size">{{ mg['size'] or '—' }}</span>
+        <span class="mg-extra">{{ icon('link', 13) }} 磁链</span>
+        <span class="mg-date">{{ mg['date'] or '' }}</span>
+      </div>
+      <div class="mg-name" title="{{ mg['name'] }}">{{ mg['name'] }}</div>
+      <div class="mg-foot">
+        <div class="mg-tags">
+          <span class="mg-badge {{ 'on' if mg['has_hd'] else 'off' }}">HD</span>
+          <span class="mg-badge {{ 'on' if mg['has_cn'] else 'off' }}">字幕</span>
+          <span class="mg-badge {{ 'break' if mg['has_uc'] else 'off' }}">破解</span>
+        </div>
+        <div class="mg-actions">
+          {% if mg['pushed'] %}<span class="badge push-done">已推送</span>{% endif %}
+          <button class="copy-btn" data-magnet="{{ mg['magnet'] }}" onclick="copyMagnet(this)">{{ icon('copy', 13) }} 复制</button>
+          <button class="push-btn" data-magnet="{{ mg['magnet'] }}" data-name="{{ mg['name'] }}" data-size="{{ mg['size'] }}" data-movie="{{ movie['id'] }}" data-code="{{ mg['code'] }}" onclick="pushMagnet(this)">{{ icon('send', 13) }} 推送</button>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+    {% elif fetching_magnets %}
+    <div class="loading-hint"><span class="spinner"></span>正在加载磁链...</div>
+    {% else %}
+    <div class="empty-card" style="padding:1.5rem;">暂无磁链，点击上方「重新获取」或到 JAVBUS 获取。</div>
+    {% endif %}
+  </div>
+
+  <div class="tab-panel" id="tab-ed2k" style="display:none;">
+    {% if comment_magnets %}
+    <p class="mg-note">{{ icon('info', 13) }} 以下为评论区用户分享的磁力/ED2K 链接，附分享者用户名及原评论。</p>
+    {% for mg in comment_magnets %}
+    <div class="magnet-card">
+      <div class="mg-top">
+        <span class="mg-size">{{ mg['size'] or '—' }}</span>
+        <span class="mg-extra">{{ icon('link', 13) }} {% if mg['kind'] == 'ed2k' %}ED2K{% else %}磁链{% endif %}</span>
+        <span class="mg-date">{{ mg['date'] or '' }}</span>
+      </div>
+      <div class="mg-name" title="{{ mg['name'] }}">{{ mg['name'] }}</div>
+      <div class="mg-comment-sharer">
+        {{ icon('user', 12) }}
+        {% if mg['sharer'] and mg['sharer_id'] %}<span class="mg-sharer link" data-sharer-id="{{ mg['sharer_id'] }}" data-sharer="{{ mg['sharer'] }}" title="查看 TA 分享的所有影片">{{ mg['sharer'] }}</span>
+        {% elif mg['sharer'] %}<span class="mg-sharer">{{ mg['sharer'] }}</span>
+        {% else %}<span class="mg-sharer muted">匿名</span>{% endif %}
+        <span class="mg-comment" title="{{ mg['comment'] }}">{{ mg['comment'] }}</span>
+      </div>
+      <div class="mg-foot">
+        <div class="mg-tags">
+          <span class="mg-badge {{ 'on' if mg['has_hd'] else 'off' }}">HD</span>
+          <span class="mg-badge {{ 'on' if mg['has_cn'] else 'off' }}">字幕</span>
+          <span class="mg-badge {{ 'break' if mg['has_uc'] else 'off' }}">破解</span>
+        </div>
+        <div class="mg-actions">
+          {% if mg['pushed'] %}<span class="badge push-done">已推送</span>{% endif %}
+          <button class="copy-btn" data-magnet="{{ mg['magnet'] }}" onclick="copyMagnet(this)">{{ icon('copy', 13) }} 复制</button>
+          <button class="push-btn" data-magnet="{{ mg['magnet'] }}" data-name="{{ mg['name'] }}" data-size="{{ mg['size'] }}" data-movie="{{ movie['id'] }}" data-code="{{ movie['number'] }}" onclick="pushMagnet(this)">{{ icon('send', 13) }} 推送</button>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-card" style="padding:1.5rem;">评论区暂无用户分享的磁链/ED2K 链接。</div>
+    {% endif %}
+  </div>
+
+  <div class="tab-panel" id="tab-related" style="display:none;">
+    {% if related_lists %}
+    <div class="related-grid">
+      {% for lst in related_lists %}
+      <a class="rel-card" href="/list/{{ lst['id'] }}">
+        <div class="rel-name">{{ lst['name'] }}</div>
+        <div class="rel-count">{{ lst['movies_count'] or 0 }} 部影片 →</div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-card" style="padding:1.5rem;">暂无关联清单。</div>
+    {% endif %}
+  </div>
+
+  <div class="tab-panel" id="tab-reviews" style="display:none;">
+    {% if reviews %}
+    <div style="display:flex;flex-direction:column;gap:0.8rem;">
+      {% for r in reviews %}
+      <div style="padding:0.7rem 0;border-bottom:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.35rem;">
+          <span style="font-weight:600;font-size:0.88rem;">{{ r['username'] or '匿名' }}</span>
+          {% if r['score'] %}<span class="badge">★ {{ r['score'] }}</span>{% endif %}
+          {% if r['likes_count'] %}<span style="color:var(--text-muted);font-size:0.78rem;">{{ r['likes_count'] }} 赞</span>{% endif %}
+        </div>
+        <div style="color:var(--text-secondary);font-size:0.88rem;line-height:1.5;">{{ r['content'] }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% if total_pages > 1 %}
+    <div class="pagination">
+      {% if rpage > 1 %}<a class="page-btn" href="?rpage={{ rpage - 1 }}">← 上一页</a>{% else %}<span class="page-btn disabled">← 上一页</span>{% endif %}
+      <span class="page-info">第 {{ rpage }} / {{ total_pages }} 页</span>
+      {% if rpage < total_pages %}<a class="page-btn" href="?rpage={{ rpage + 1 }}">下一页 →</a>{% else %}<span class="page-btn disabled">下一页 →</span>{% endif %}
+    </div>
+    {% endif %}
+    {% elif fetching_reviews %}
+    <div class="loading-hint"><span class="spinner"></span>正在加载评论...</div>
+    {% else %}
+    <div class="empty-card" style="padding:1.5rem;">暂无评论。</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="lightbox-overlay" id="lightbox" style="display:none;" onclick="if(event.target===this)closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()" title="关闭">×</button>
+  <button class="lightbox-arrow prev" onclick="stepLightbox(-1)" title="上一张">‹</button>
+  <img class="lightbox-img" id="lightbox-img" src="" alt="预览图">
+  <button class="lightbox-arrow next" onclick="stepLightbox(1)" title="下一张">›</button>
+</div>
+
+<!-- 分享者弹窗已全局化到 base.html（内含关注按钮） -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% if pending_fetch %}
+// 后台补抓完整详情/磁链/评论；完成后局部刷新（只替换 <main> 内容），不整页重载
+(function () {
+  var MOVIE_ID = '{{ movie['id'] }}';
+  var tries = 0;
+  function refreshDetail() {
+    fetch(location.pathname + '?_auto=1').then(function (r) { return r.text(); }).then(function (html) {
+      var doc = new DOMParser().parseFromString(html, 'text/html');
+      var fresh = doc.querySelector('main.main-content');
+      var cur = document.querySelector('main.main-content');
+      if (fresh && cur) { cur.innerHTML = fresh.innerHTML; }
+    }).catch(function () {});
+  }
+  function poll() {
+    fetch('/api/movie/' + MOVIE_ID + '/pending').then(function (r) { return r.json(); }).then(function (d) {
+      if (d.done) { refreshDetail(); }
+      else if (tries++ < 60) { setTimeout(poll, 1500); }
+    }).catch(function () { if (tries++ < 60) setTimeout(poll, 2000); });
+  }
+  setTimeout(refreshDetail, 20000);  // 兜底：20s 后强制拉一次
+  poll();
+})();
+{% endif %}
+
+async function doAction(url, body, label) {
+  toast('正在' + label + ' …');
+  try {
+    const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+    const j = await r.json();
+    if (j.ok) { toast(label + '完成'); setTimeout(() => location.reload(), 400); }
+    else { toast(label + '失败: ' + (j.error || '未知错误')); }
+  } catch (err) { toast(label + '失败: ' + err); }
+}
+function copyMagnet(btn) {
+  const text = btn.getAttribute('data-magnet');
+  copyTextToClipboard(text).then(() => {
+    toast('已复制磁链');
+    btn.innerHTML = '{{ icon("check", 13) }} 已复制';
+    setTimeout(() => { btn.innerHTML = '{{ icon("copy", 13) }} 复制'; }, 1500);
+  }).catch(() => toast('复制失败'));
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(function (b) {
+    b.classList.toggle('active', b.getAttribute('data-tab') === name);
+  });
+  document.querySelectorAll('.tab-panel').forEach(function (p) {
+    p.style.display = (p.id === 'tab-' + name) ? 'block' : 'none';
+  });
+}
+
+function scrollRel(dir) {
+  var t = document.getElementById('rel-track');
+  if (t) t.scrollBy({left: dir * 480, behavior: 'smooth'});
+}
+
+// —— 预览图全屏查看器 ——
+var lightboxImages = [];
+var lightboxIndex = 0;
+
+function openLightbox(index) {
+  var grid = document.getElementById('preview-grid');
+  if (!grid) return;
+  lightboxImages = Array.from(grid.querySelectorAll('img')).map(function (img) { return img.src; });
+  if (!lightboxImages.length) return;
+  lightboxIndex = index;
+  showLightbox();
+}
+function showLightbox() {
+  document.getElementById('lightbox-img').src = lightboxImages[lightboxIndex];
+  document.getElementById('lightbox').style.display = 'flex';
+}
+function closeLightbox() {
+  document.getElementById('lightbox').style.display = 'none';
+}
+function stepLightbox(delta) {
+  if (!lightboxImages.length) return;
+  lightboxIndex = (lightboxIndex + delta + lightboxImages.length) % lightboxImages.length;
+  showLightbox();
+}
+document.addEventListener('keydown', function (e) {
+  var lb = document.getElementById('lightbox');
+  if (lb && lb.style.display !== 'none') {
+    if (e.key === 'Escape') closeLightbox();
+    else if (e.key === 'ArrowLeft') stepLightbox(-1);
+    else if (e.key === 'ArrowRight') stepLightbox(1);
+  }
+});
+
+// —— 详情页播放器：整片优先(Emby/Jellyfin)、预告(m3u8)兜底；内置+外置；全屏；自动降级 ——
+var _hls = null;             // hls.js 实例
+var _playerEl = null;        // 当前 <video>
+var _playData = null;        // /play 返回数据
+var _fallbackTried = false;  // 是否已尝试切转码 HLS
+var _coverEl = document.getElementById('detail-cover');
+
+function ensureHls(cb) {     // 懒加载 hls.js（locals vendor，免构建）
+  if (window.Hls) return cb(null, window.Hls);
+  var s = document.createElement('script');
+  s.src = '/static/vendor/hls.min.js';
+  s.onload = function () { cb(null, window.Hls); };
+  s.onerror = function () { cb(new Error('hls.js 加载失败')); };
+  document.head.appendChild(s);
+}
+
+async function openPlayer() {
+  toast('正在获取播放源…');
+  try {
+    var r = await fetch('/api/movie/{{ movie['id'] }}/play');
+    var j = await r.json();
+    if (!j || !j.ok) throw new Error((j && j.error) || (j && j.source && j.source.label) || '无可用播放源');
+    // 预告流签名已过期：提示可「重新获取」刷新源
+    if (j.source && j.source.type === 'preview' && j.source.expired) {
+      toast('预告流已过期，可点击上方「重新获取」刷新后重试');
+      // 继续尝试播放（可能部分分段仍可用），失败走 handlePlayError
+    }
+    startPlayback(j);
+  } catch (e) { toast('播放失败：' + e.message); }
+}
+
+function startPlayback(j) {
+  _playData = j;
+  _fallbackTried = false;
+  var src = j.source, urls = src.urls || [];
+  var choosen = urls.find(function (u) { return u.kind === 'direct'; }) || urls[0];
+  if (!choosen) { toast('无可用播放地址'); return; }
+
+  _coverEl.classList.add('video-mode');
+  var pb = document.getElementById('detail-play-btn'); if (pb) pb.style.display = 'none';
+  document.getElementById('detail-player-bar').hidden = false;
+  document.getElementById('player-label').textContent = src.label;
+
+  destroyPlayer();
+  _playerEl = document.createElement('video');
+  _playerEl.controls = false;          // 自定义控件：去掉原生（避免顶部白条）
+  _playerEl.autoplay = true;
+  _playerEl.playsInline = true;
+  _playerEl.preload = 'auto';
+  // 点击画面切换播放/暂停
+  _playerEl.addEventListener('click', function () {
+    if (_playerEl.paused) { _playerEl.play().catch(function () {}); }
+    else { _playerEl.pause(); }
+  });
+  _coverEl.insertBefore(_playerEl, _coverEl.querySelector('img') || _coverEl.firstChild);
+
+  var url = choosen.url;
+  var isHls = choosen.kind === 'hls' || /\.m3u8([?#]|$)/.test(url);
+  if (isHls) {
+    ensureHls(function (err, Hls) {
+      if (err || !Hls || !Hls.isSupported()) { _playerEl.src = url; playFallback(); return; }
+      _hls = new Hls();
+      _hls.loadSource(url);
+      _hls.attachMedia(_playerEl);
+      _hls.on(Hls.Events.ERROR, function (ev, data) { if (data && data.fatal) handlePlayError(); });
+    });
+  } else {
+    _playerEl.src = url;
+    _playerEl.addEventListener('error', handlePlayError);
+  }
+  _playerEl.play().catch(function () {});
+  bindControl();   // 绑定底部控制条（进度/时间/音量）
+}
+
+// 播放失败：先自动切转码 HLS；已尝试仍失败则提示切外置
+function handlePlayError() {
+  if (_fallbackTried) {
+    toast('此格式浏览器无法播放，请用「用电脑播放器」');
+    return;
+  }
+  _fallbackTried = true;
+  var hls = (_playData.source.urls || []).find(function (u) { return u.kind === 'hls'; });
+  if (hls) {
+    toast('正在切换转码 HLS…');
+    destroyPlayer();
+    _playerEl = document.createElement('video');
+    _playerEl.controls = false; _playerEl.autoplay = true; _playerEl.playsInline = true;
+    _playerEl.addEventListener('click', function () {
+      if (_playerEl.paused) { _playerEl.play().catch(function () {}); }
+      else { _playerEl.pause(); }
+    });
+    _coverEl.insertBefore(_playerEl, document.getElementById('detail-player-bar'));
+    ensureHls(function (err, Hls) {
+      if (err || !Hls || !Hls.isSupported()) { _playerEl.src = hls.url; return; }
+      _hls = new Hls();
+      _hls.loadSource(hls.url);
+      _hls.attachMedia(_playerEl);
+      _hls.on(Hls.Events.ERROR, function (ev, data) { if (data && data.fatal) handlePlayError(); });
+    });
+    _playerEl.play().catch(function () {});
+    bindControl();
+  } else {
+    toast('此格式浏览器无法播放，请用「用电脑播放器」');
+  }
+}
+
+function destroyPlayer() {
+  if (_playerEl) { try { _playerEl.pause(); } catch (e) {} _playerEl.remove(); _playerEl = null; }
+  if (_hls) { try { _hls.destroy(); } catch (e) {} _hls = null; }
+}
+
+function closePlayer() {
+  destroyPlayer();
+  _coverEl.classList.remove('video-mode');
+  var pb = document.getElementById('detail-play-btn'); if (pb) pb.style.display = '';
+  document.getElementById('detail-player-bar').hidden = true;
+  document.getElementById('player-control').hidden = true;
+  try { if (document.fullscreenElement) document.exitFullscreen(); } catch (e) {}
+}
+
+function toggleFullscreen() {
+  if (document.fullscreenElement) { document.exitFullscreen(); }
+  else if (_coverEl.requestFullscreen) { _coverEl.requestFullscreen(); }
+  else { toast('当前浏览器不支持全屏'); }
+}
+
+// —— 播放控制条：进度 / 时间 / 播放暂停 / 音量 ——
+function fmtTime(sec) {
+  sec = Math.max(0, Math.floor(sec || 0));
+  var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  return (h > 0 ? h + ':' + ('0' + m).slice(-2) : m) + ':' + ('0' + s).slice(-2);
+}
+function updateControl() {
+  if (!_playerEl) return;
+  var dur = _playerEl.duration || 0;
+  var cur = _playerEl.currentTime || 0;
+  var pct = dur ? (cur / dur * 100) : 0;
+  document.getElementById('pc-done').style.width = pct + '%';
+  document.getElementById('pc-thumb').style.left = pct + '%';
+  // 缓冲
+  var buf = 0;
+  try { if (_playerEl.buffered.length) buf = _playerEl.buffered.end(_playerEl.buffered.length - 1) / dur * 100; } catch (e) {}
+  document.getElementById('pc-buffer').style.width = buf + '%';
+  document.getElementById('pc-time').textContent = fmtTime(cur) + ' / ' + fmtTime(dur);
+  var pp = document.getElementById('pc-playpause');
+  pp.innerHTML = _playerEl.paused ? '{{ icon("play", 16) }}' : '{{ icon("pause", 16) }}';
+  // 音量
+  var vol = (_playerEl.muted ? 0 : (_playerEl.volume == null ? 1 : _playerEl.volume));
+  document.getElementById('pc-vol-done').style.width = (vol * 100) + '%';
+  document.getElementById('pc-vol-thumb').style.left = (vol * 100) + '%';
+  document.getElementById('pc-mute').innerHTML = (_playerEl.muted || vol <= 0) ? '{{ icon("mute", 16) }}' : '{{ icon("volume", 16) }}';
+}
+function bindControl() {
+  var pc = document.getElementById('player-control');
+  pc.hidden = false;
+  if (_playerEl) {
+    _playerEl.addEventListener('timeupdate', updateControl);
+    _playerEl.addEventListener('progress', updateControl);
+    _playerEl.addEventListener('play', updateControl);
+    _playerEl.addEventListener('pause', updateControl);
+    _playerEl.addEventListener('loadedmetadata', updateControl);
+    updateControl();
+  }
+  // 进度条点击/拖动跳转
+  var seek = document.getElementById('pc-seek');
+  seek.addEventListener('click', function (e) {
+    if (!_playerEl || !_playerEl.duration) return;
+    var r = seek.getBoundingClientRect();
+    var pct = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+    _playerEl.currentTime = pct * _playerEl.duration;
+  });
+  // 音量条点击/拖动
+  var vol = document.getElementById('pc-vol');
+  vol.addEventListener('click', function (e) {
+    if (!_playerEl) return;
+    var r = vol.getBoundingClientRect();
+    var pct = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+    _playerEl.volume = pct; _playerEl.muted = pct <= 0; updateControl();
+  });
+}
+function togglePlayPause() {
+  if (!_playerEl) return;
+  if (_playerEl.paused) { _playerEl.play().catch(function () {}); } else { _playerEl.pause(); }
+}
+function toggleMute() {
+  if (!_playerEl) return;
+  _playerEl.muted = !_playerEl.muted; updateControl();
+}
+
+var _extTimer = null;   // 外置菜单自动收起定时器
+
+function openExtMenu() {
+  var m = document.getElementById('player-ext-menu');
+  var def = (_playData && _playData.default_player) || '';
+  m.innerHTML = (_playData && (_playData.players || [])).map(function (p) {
+    var tag = p.key === def ? '（默认）' : '';
+    return '<button class="player-ext-item" data-ext="' + p.key + '" data-scheme="' + p.scheme + '">' + escHtml(p.label) + tag + '</button>';
+  }).join('') +
+    '<button class="player-ext-item copy" data-copy="1">复制播放地址</button>';
+  m.querySelectorAll('[data-ext]').forEach(function (b) {
+    b.onclick = function (e) { e.stopPropagation(); launchExternal(b.dataset.ext, b.dataset.scheme); };
+  });
+  m.querySelectorAll('[data-copy]').forEach(function (b) {
+    b.onclick = function (e) {
+      e.stopPropagation();
+      var u = (_playData.source.urls && _playData.source.urls[0]) ? _playData.source.urls[0].url : _playData.source.url;
+      copyTextToClipboard(u).then(function () { toast('已复制播放地址'); }).catch(function () { toast('复制失败'); });
+    };
+  });
+  m.hidden = false;
+  document.getElementById('detail-player-bar').classList.add('menu-open');   // 菜单展开时保持工具条可见
+  scheduleExtClose(3500);                                                    // 几秒不选自动收起
+}
+
+function closeExtMenu() {
+  var m = document.getElementById('player-ext-menu');
+  m.hidden = true;
+  document.getElementById('detail-player-bar').classList.remove('menu-open');
+  if (_extTimer) { clearTimeout(_extTimer); _extTimer = null; }
+}
+
+function toggleExtMenu() {
+  var m = document.getElementById('player-ext-menu');
+  if (m.hidden) { openExtMenu(); } else { closeExtMenu(); }
+}
+
+function scheduleExtClose(ms) {
+  if (_extTimer) clearTimeout(_extTimer);
+  _extTimer = setTimeout(closeExtMenu, ms);
+}
+
+function launchExternal(key, scheme) {
+  var u = (_playData.source.urls && _playData.source.urls[0]) ? _playData.source.urls[0].url : _playData.source.url;
+  var p = (_playData.players || []).find(function (x) { return x.key === key; });
+  closeExtMenu();
+  window.location.href = scheme + encodeURIComponent(u);
+  toast('已尝试用 ' + (p ? p.label : key) + ' 播放；若未弹出，请用「复制播放地址」。');
+}
+
+function escHtml(v) {
+  var div = document.createElement('div');
+  div.textContent = v == null ? '' : String(v);
+  return div.innerHTML;
+}
+
+document.addEventListener('click', function (e) {
+  // 点击工具条(全屏/关闭/外置)或外置菜单内时不清菜单；否则收起
+  if (!e.target.closest('#player-ext-toggle') && !e.target.closest('.player-ext-menu')) {
+    var m = document.getElementById('player-ext-menu');
+    if (m && !m.hidden) closeExtMenu();
+  }
+});
+
+// 鼠标停在菜单内：取消自动收起；移出：重新排自动收起
+var extMenu = document.getElementById('player-ext-menu');
+if (extMenu) {
+  extMenu.addEventListener('mouseenter', function () { if (_extTimer) { clearTimeout(_extTimer); _extTimer = null; } });
+  extMenu.addEventListener('mouseleave', function () { scheduleExtClose(2500); });
+}
+</script>
+{% endblock %}

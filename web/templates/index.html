@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, videocard %}
+{% block title %}JD online{% endblock %}
+
+{% block content %}
+<div class="page-header" style="margin-bottom:1.5rem;">
+  <h1>{% if q %}{{ st_label }}「{{ q }}」{% else %}媒体库{% endif %}</h1>
+</div>
+
+<div class="module">
+  <div class="overview-panel">
+    <div class="overview-header">
+      <div class="overview-title">数据概览</div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-num">{{ counts.get('movies', 0) }}</div><div class="stat-label">影片</div></div>
+      <div class="stat-card"><div class="stat-num">{{ counts.get('actors', 0) }}</div><div class="stat-label">演员</div></div>
+      <div class="stat-card"><div class="stat-num">{{ counts.get('magnets', 0) }}</div><div class="stat-label">磁链</div></div>
+      <div class="stat-card"><div class="stat-num">{{ counts.get('reviews', 0) }}</div><div class="stat-label">评论</div></div>
+      <div class="stat-card"><div class="stat-num">{{ counts.get('library_items', 0) }}</div><div class="stat-label">媒体库条目</div></div>
+      <div class="stat-card"><div class="stat-num">{{ counts.get('media_servers', 0) }}</div><div class="stat-label">媒体服务器</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="module">
+  <div class="module-header">
+    <div class="module-title">{{ icon('film') }} 最近查看</div>
+    <a class="module-link" href="/settings">去设置同步媒体库 →</a>
+  </div>
+  {% if movies %}
+  <div class="video-grid">
+    {% for m in movies %}
+    {{ videocard(m, lib_codes, True) }}
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-card">
+    {{ icon('film', 28) }}
+    <p>{% if q %}没有找到「{{ q }}」。{% else %}还没有数据，去设置里同步媒体库吧。{% endif %}</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}{% endblock %}
