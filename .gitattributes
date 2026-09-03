@@ -1,0 +1,8 @@
+# 统一文本文件为 LF，避免 Windows 下 CRLF 行尾抖动
+* text=auto eol=lf
+
+# 明确二进制的文件不转行
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
