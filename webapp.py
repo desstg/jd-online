@@ -1817,8 +1817,10 @@ def create_app() -> Flask:
         servers = db.get_servers()
         if not servers:
             return jsonify(ok=False, error="没有配置媒体服务器"), 400
-        total, results = sync.sync_library(db, servers)
-        return jsonify(ok=True, total=total, results=results)
+        sync.sync_library(db, servers)
+        # 返回去重后的影片数（同一番号多条记录只算一部），才是真正入库的影片数
+        total = db.conn.execute("SELECT COUNT(DISTINCT code) FROM library_items").fetchone()[0]
+        return jsonify(ok=True, total=total)
 
     @app.route("/api/sync/schedule", methods=["POST"])
     def api_sync_schedule():
