@@ -7,6 +7,36 @@
   <h1>影库 <span class="rank-count">{{ total }}</span></h1>
 </div>
 
+<div class="search-filter">
+  <select class="filter-sel" onchange="goLibrary()" name="filter" title="筛选">
+    <option value="all" {{ 'selected' if filter_ == 'all' }}>筛选 全部</option>
+    <option value="censored" {{ 'selected' if filter_ == 'censored' }}>有码</option>
+    <option value="uncensored" {{ 'selected' if filter_ == 'uncensored' }}>无码</option>
+    <option value="european" {{ 'selected' if filter_ == 'european' }}>欧美</option>
+    <option value="fc2" {{ 'selected' if filter_ == 'fc2' }}>FC2</option>
+  </select>
+
+  <select class="filter-sel" onchange="goLibrary()" name="year" title="年份">
+    <option value="" {{ 'selected' if not year }}>年份 全部</option>
+    {% for y in range(2026, 1999, -1) %}
+    <option value="{{ y }}" {{ 'selected' if year == (y|string) }}>{{ y }}</option>
+    {% endfor %}
+  </select>
+
+  <div class="search-sort" title="排序">
+    <button type="button" class="sort-chip {{ 'active' if sort == 'release_date' }}" data-sort="release_date" onclick="goSort('release_date')">上映日期<span class="sort-dir">{{ '↑' if sort == 'release_date' and dir_ == 'asc' else '↓' }}</span></button>
+    <button type="button" class="sort-chip {{ 'active' if sort == 'score' }}" data-sort="score" onclick="goSort('score')">评分<span class="sort-dir">{{ '↑' if sort == 'score' and dir_ == 'asc' else '↓' }}</span></button>
+    <button type="button" class="sort-chip {{ 'active' if sort == 'relevance' }}" data-sort="relevance" onclick="goSort('relevance')">相关度</button>
+  </div>
+</div>
+
+{% if tag %}
+<div class="tag-filter-bar">
+  <span class="tag-filter-label">{{ icon('folder', 14) }} 标签：<b>{{ tag }}</b></span>
+  <a class="tag-filter-clear" href="/library" title="清除标签筛选">{{ icon('x', 13) }} 清除</a>
+</div>
+{% endif %}
+
 {% if movies %}
 <div class="video-grid">
   {% for m in movies %}
@@ -15,12 +45,29 @@
 </div>
 
 {% if total_pages > 1 %}
-<div class="pagination">
-  {% if page > 1 %}<a class="page-btn" href="/library?page={{ page - 1 }}">← 上一页</a>
+<div class="pagination rank-pagination">
+  {% set base = '/library?filter=' ~ filter_ ~ '&year=' ~ year ~ '&sort=' ~ sort ~ '&dir=' ~ dir_ ~ '&tag=' ~ (tag | urlencode) %}
+  {% if page > 1 %}<a class="page-btn" href="{{ base }}&page={{ page - 1 }}">← 上一页</a>
   {% else %}<span class="page-btn disabled">← 上一页</span>{% endif %}
+  <div class="page-numbers" aria-label="分页">
+    {% for p in page_items %}
+    {% if p is none %}<span class="page-gap">…</span>
+    {% else %}<a class="page-number {{ 'active' if p == page }}" href="{{ base }}&page={{ p }}">{{ p }}</a>{% endif %}
+    {% endfor %}
+  </div>
   <span class="page-info">第 {{ page }} / {{ total_pages }} 页</span>
-  {% if page < total_pages %}<a class="page-btn" href="/library?page={{ page + 1 }}">下一页 →</a>
+  {% if page < total_pages %}<a class="page-btn" href="{{ base }}&page={{ page + 1 }}">下一页 →</a>
   {% else %}<span class="page-btn disabled">下一页 →</span>{% endif %}
+  <form class="page-jump" action="/library" method="get">
+    <input type="hidden" name="filter" value="{{ filter_ }}">
+    <input type="hidden" name="year" value="{{ year }}">
+    <input type="hidden" name="sort" value="{{ sort }}">
+    <input type="hidden" name="dir" value="{{ dir_ }}">
+    <input type="hidden" name="tag" value="{{ tag }}">
+    <label for="lib-page-jump">跳转到</label>
+    <input id="lib-page-jump" name="page" type="number" min="1" max="{{ total_pages }}" value="{{ page }}" aria-label="跳转页码">
+    <button type="submit">页</button>
+  </form>
 </div>
 {% endif %}
 {% else %}
@@ -29,4 +76,35 @@
   <p>影库为空，去首页输入番号抓取影视入库吧。</p>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+var CUR_SORT = '{{ sort }}';
+var CUR_DIR = '{{ dir_ }}';
+var CUR_TAG = '{{ tag | e }}';
+function buildUrl(f, y, s, d, t) {
+  return '/library?filter=' + encodeURIComponent(f) + '&year=' + encodeURIComponent(y) +
+         '&sort=' + encodeURIComponent(s) + '&dir=' + encodeURIComponent(d) +
+         '&tag=' + encodeURIComponent(t == null ? CUR_TAG : t);
+}
+function goLibrary() {  // 筛选/年份变化 → 保持当前排序与方向
+  var f = document.querySelector('.search-filter');
+  var filter = f.querySelector('[name=filter]').value;
+  var year = f.querySelector('[name=year]').value;
+  window.location.href = buildUrl(filter, year, CUR_SORT, CUR_DIR);
+}
+function goSort(key) {
+  var f = document.querySelector('.search-filter');
+  var filter = f.querySelector('[name=filter]').value;
+  var year = f.querySelector('[name=year]').value;
+  var dir;
+  if (key === CUR_SORT && (key === 'release_date' || key === 'score')) {
+    dir = (CUR_DIR === 'desc') ? 'asc' : 'desc';   // 再次选中：切换方向
+  } else {
+    dir = 'desc';                                    // 新选中：默认倒序
+  }
+  window.location.href = buildUrl(filter, year, key, dir);
+}
+</script>
 {% endblock %}

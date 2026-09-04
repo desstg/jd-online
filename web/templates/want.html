@@ -133,10 +133,23 @@
     </div>
 
     {% if total_pages > 1 %}
-    <div class="pagination">
-      {% if page > 1 %}<a class="page-btn" href="/want?view={{ view }}&page={{ page - 1 }}">← 上一页</a>{% else %}<span class="page-btn disabled">← 上一页</span>{% endif %}
+    <div class="pagination rank-pagination">
+      {% set base = '/want?view=' ~ view %}
+      {% if page > 1 %}<a class="page-btn" href="{{ base }}&page={{ page - 1 }}">← 上一页</a>{% else %}<span class="page-btn disabled">← 上一页</span>{% endif %}
+      <div class="page-numbers" aria-label="分页">
+        {% for p in page_items %}
+        {% if p is none %}<span class="page-gap">…</span>
+        {% else %}<a class="page-number {{ 'active' if p == page }}" href="{{ base }}&page={{ p }}">{{ p }}</a>{% endif %}
+        {% endfor %}
+      </div>
       <span class="page-info">第 {{ page }} / {{ total_pages }} 页</span>
-      {% if page < total_pages %}<a class="page-btn" href="/want?view={{ view }}&page={{ page + 1 }}">下一页 →</a>{% else %}<span class="page-btn disabled">下一页 →</span>{% endif %}
+      {% if page < total_pages %}<a class="page-btn" href="{{ base }}&page={{ page + 1 }}">下一页 →</a>{% else %}<span class="page-btn disabled">下一页 →</span>{% endif %}
+      <form class="page-jump" action="/want" method="get">
+        <input type="hidden" name="view" value="{{ view }}">
+        <label for="want-page-jump">跳转到</label>
+        <input id="want-page-jump" name="page" type="number" min="1" max="{{ total_pages }}" value="{{ page }}" aria-label="跳转页码">
+        <button type="submit">页</button>
+      </form>
     </div>
     {% endif %}
   </div>

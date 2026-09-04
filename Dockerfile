@@ -13,6 +13,8 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
+    PIP_ROOT_USER_ACTION=ignore \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
     TZ=Asia/Shanghai
 
 WORKDIR /app
@@ -27,7 +29,7 @@ COPY javdb ./javdb
 COPY web ./web
 
 # 非 root 用户；数据目录归属该用户，保证首次启动可写
-RUN useradd -r -u 1000 -m appuser \
+RUN useradd -u 1000 -m appuser \
     && chown -R appuser:appuser /app \
     && mkdir -p /data && chown appuser:appuser /data
 

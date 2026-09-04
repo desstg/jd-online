@@ -47,6 +47,8 @@ DEFAULTS: dict = {
     "sub_retry_enabled": True,
     "sub_sync_enabled": False,
     "sub_sync_times": ["08:00", "20:00"],
+    # 磁链库（设置页「扩展磁链库」）：拉取/统计超时
+    "magnet_timeout": 30,
 }
 
 # JAVDB 移动端 API 镜像节点（设置页可切换）
@@ -89,4 +91,5 @@ def editable_keys() -> tuple[str, ...]:
         "sub_check_enabled", "sub_daily_times", "sub_check_interval", "sub_concurrency",
         "sub_interval_min", "sub_interval_max", "sub_timeout", "sub_retry_enabled",
         "sub_sync_enabled", "sub_sync_times",
+        "magnet_timeout",
     )

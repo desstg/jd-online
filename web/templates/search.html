@@ -24,11 +24,11 @@
     {% endfor %}
   </select>
 
-  <select class="filter-sel" onchange="goSearch()" name="sort" title="排序">
-    <option value="release_date" {{ 'selected' if sort == 'release_date' }}>排序 上映日期</option>
-    <option value="score" {{ 'selected' if sort == 'score' }}>排序 评分</option>
-    <option value="relevance" {{ 'selected' if sort == 'relevance' }}>排序 相关度</option>
-  </select>
+  <div class="search-sort" title="排序">
+    <button type="button" class="sort-chip {{ 'active' if sort == 'release_date' }}" data-sort="release_date" onclick="goSort('release_date')">上映日期<span class="sort-dir">{{ '↑' if sort == 'release_date' and dir_ == 'asc' else '↓' }}</span></button>
+    <button type="button" class="sort-chip {{ 'active' if sort == 'score' }}" data-sort="score" onclick="goSort('score')">评分<span class="sort-dir">{{ '↑' if sort == 'score' and dir_ == 'asc' else '↓' }}</span></button>
+    <button type="button" class="sort-chip {{ 'active' if sort == 'relevance' }}" data-sort="relevance" onclick="goSort('relevance')">相关度</button>
+  </div>
 </div>
 
 {% if error %}
@@ -50,28 +50,60 @@
 {% endif %}
 
 {% if movies and total_pages and total_pages > 1 %}
-<div class="pagination">
-  {% set base = '/search?type=' ~ (request.args.get('type','all') | urlencode) ~ '&q=' ~ (q | urlencode) ~ '&filter=' ~ filter_ ~ '&year=' ~ year ~ '&sort=' ~ sort %}
+<div class="pagination rank-pagination">
+  {% set base = '/search?type=' ~ (request.args.get('type','all') | urlencode) ~ '&q=' ~ (q | urlencode) ~ '&filter=' ~ filter_ ~ '&year=' ~ year ~ '&sort=' ~ sort ~ '&dir=' ~ dir_ %}
   {% if page > 1 %}<a class="page-btn" href="{{ base }}&page={{ page - 1 }}">← 上一页</a>{% else %}<span class="page-btn disabled">← 上一页</span>{% endif %}
+  <div class="page-numbers" aria-label="分页">
+    {% for p in page_items %}
+    {% if p is none %}<span class="page-gap">…</span>
+    {% else %}<a class="page-number {{ 'active' if p == page }}" href="{{ base }}&page={{ p }}">{{ p }}</a>{% endif %}
+    {% endfor %}
+  </div>
   <span class="page-info">第 {{ page }} / {{ total_pages }} 页</span>
   {% if page < total_pages %}<a class="page-btn" href="{{ base }}&page={{ page + 1 }}">下一页 →</a>{% else %}<span class="page-btn disabled">下一页 →</span>{% endif %}
+  <form class="page-jump" action="/search" method="get">
+    <input type="hidden" name="type" value="{{ request.args.get('type','all') }}">
+    <input type="hidden" name="q" value="{{ q }}">
+    <input type="hidden" name="filter" value="{{ filter_ }}">
+    <input type="hidden" name="year" value="{{ year }}">
+    <input type="hidden" name="sort" value="{{ sort }}">
+    <input type="hidden" name="dir" value="{{ dir_ }}">
+    <label for="search-page-jump">跳转到</label>
+    <input id="search-page-jump" name="page" type="number" min="1" max="{{ total_pages }}" value="{{ page }}" aria-label="跳转页码">
+    <button type="submit">页</button>
+  </form>
 </div>
 {% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
-function goSearch() {
+var CUR_SORT = '{{ sort }}';
+var CUR_DIR = '{{ dir_ }}';
+function buildUrl(f, y, s, d) {
+  var type = '{{ request.args.get("type", "all") }}';
+  var q = '{{ q | replace("'", "\\'") }}';
+  return '/search?type=' + encodeURIComponent(type) + '&q=' + encodeURIComponent(q) +
+         '&filter=' + encodeURIComponent(f) + '&year=' + encodeURIComponent(y) +
+         '&sort=' + encodeURIComponent(s) + '&dir=' + encodeURIComponent(d);
+}
+function goSearch() {  // 筛选/年份变化 → 保持当前排序与方向
   var f = document.querySelector('.search-filter');
   var filter = f.querySelector('[name=filter]').value;
   var year = f.querySelector('[name=year]').value;
-  var sort = f.querySelector('[name=sort]').value;
-  var type = '{{ request.args.get("type", "all") }}';
-  var q = '{{ q | replace("'", "\\'") }}';
-  var url = '/search?type=' + encodeURIComponent(type) + '&q=' + encodeURIComponent(q) +
-            '&filter=' + encodeURIComponent(filter) + '&year=' + encodeURIComponent(year) +
-            '&sort=' + encodeURIComponent(sort);
-  window.location.href = url;
+  window.location.href = buildUrl(filter, year, CUR_SORT, CUR_DIR);
+}
+function goSort(key) {
+  var f = document.querySelector('.search-filter');
+  var filter = f.querySelector('[name=filter]').value;
+  var year = f.querySelector('[name=year]').value;
+  var dir;
+  if (key === CUR_SORT && (key === 'release_date' || key === 'score')) {
+    dir = (CUR_DIR === 'desc') ? 'asc' : 'desc';   // 再次选中：切换方向
+  } else {
+    dir = 'desc';                                    // 新选中：默认倒序
+  }
+  window.location.href = buildUrl(filter, year, key, dir);
 }
 </script>
 {% endblock %}

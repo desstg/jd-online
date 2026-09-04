@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 from .client import JavdbClient, normalize_image_url
 from .db import Database
+from .magnetlib import MagnetLibClient, MagnetLibError
 
 
 def _now() -> str:
@@ -171,6 +172,45 @@ def ingest_magnets(javbus, db: Database, code: str, movie_id: str | None = None)
         mid = row["id"] if row else None
     if mid and cover_url:
         db.set_javbus_cover(mid, cover_url)
+    db.commit()
+    return len(items)
+
+
+def ingest_source_magnets(lib: dict, db: Database, code: str, movie_id: str | None = None,
+                          timeout: int = 30, proxy: str | None = None) -> int:
+    """用自定义磁链库（lib 含 api_url_template/headers）抓取某番号磁链入库。
+
+    source 取库的 name（无则 id），便于详情页区分磁链来源。返回入库条数。
+    """
+    client = MagnetLibClient(
+        api_url_template=lib.get("api_url_template") or "",
+        headers=lib.get("headers") or [],
+        timeout=timeout,
+        proxy=proxy,
+    )
+    src = lib.get("name") or lib.get("id") or "magnetlib"
+    try:
+        items = client.fetch_magnets(code)
+    except MagnetLibError:
+        return 0
+    mid = movie_id
+    if not mid:
+        row = db.movie_by_number(code)
+        mid = row["id"] if row else None
+    for it in items:
+        db.upsert_magnet({
+            "btih": it["btih"],
+            "movie_id": mid,
+            "code": code,
+            "name": it["name"],
+            "size": it["size"],
+            "date": it["date"],
+            "magnet": it["magnet"],
+            "has_hd": it["has_hd"],
+            "has_sub": it["has_sub"],
+            "source": src,
+            "fetched_at": _now(),
+        })
     db.commit()
     return len(items)
 

@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sqlite3
@@ -25,10 +26,28 @@ from javdb.client import JavdbClient
 from javdb.db import Database
 from javdb.http import make_opener
 from javdb.javbus import JavbusClient, is_uncensored, is_chinese
+from javdb.magnetlib import MagnetLibClient, MagnetLibError, parse_stats_groups
 from javdb.mediaserver import MediaServerClient
 
 CONFIG_PATH = "config.json"
 DEFAULT_JAVBUS = "https://www.javbus.com"
+
+
+def _page_window(page: int, total: int, around: int = 2) -> list:
+    """生成分页页码窗口，None 表示省略号。只显示首/末页 + 当前页前后 N 页。"""
+    if total <= 1:
+        return [] if total == 0 else [1]
+    pages = [1]
+    lo = max(2, page - around)
+    hi = min(total - 1, page + around)
+    if lo > 2:
+        pages.append(None)
+    for p in range(lo, hi + 1):
+        pages.append(p)
+    if hi < total - 1:
+        pages.append(None)
+    pages.append(total)
+    return pages
 
 # 图片代理允许转发的域名（防 SSRF，避免被当开放代理）
 ALLOWED_IMG_HOSTS = {"tp.spfcas.com", "c0.jdbstatic.com", "javdb.com", "www.javdb.com",
@@ -609,7 +628,8 @@ def _run_subscription_check_all(db: Database, cfg: dict, pace: bool = False) -> 
 
 
 def _background_fetch_movie(db_path: str, movie_id: str, number: str,
-                            api_base: str, javbus_base: str, proxy: str) -> None:
+                            api_base: str, javbus_base: str, proxy: str,
+                            magnet_timeout: int = 30) -> None:
     """后台线程：补抓一部影片的完整详情 / 磁链 / 评论（各自缺失才抓）。"""
     try:
         db = Database(db_path)
@@ -630,6 +650,21 @@ def _background_fetch_movie(db_path: str, movie_id: str, number: str,
                 scrape.ingest_reviews(client, db, movie_id, max_pages=5)
             except Exception:  # noqa: BLE001
                 pass
+        # 自定义磁链库（AVdb 等）：该影片还没有来自这些库的磁链 → 抓取
+        srcs = [s for s in db.list_magnet_sources() if s.get("enabled") and s.get("api_url_template")]
+        lib_names = [(s.get("name") or s.get("id")) for s in srcs]
+        if lib_names:
+            ph = ",".join("?" for _ in lib_names)
+            has_lib = db.conn.execute(
+                f"SELECT 1 FROM magnets WHERE movie_id=? AND source IN ({ph}) LIMIT 1",
+                (movie_id, *lib_names)).fetchone()
+            if not has_lib:
+                for lib in srcs:
+                    try:
+                        # 磁链库（AVdb）为内网服务，不走全局代理
+                        scrape.ingest_source_magnets(lib, db, number, movie_id, magnet_timeout, None)
+                    except Exception:  # noqa: BLE001
+                        pass
         db.close()
     except Exception:  # noqa: BLE001
         pass
@@ -961,13 +996,24 @@ def create_app() -> Flask:
             "SELECT 1 FROM magnets WHERE movie_id=?", (movie_id,)).fetchone() is not None
         has_reviews = db.conn.execute(
             "SELECT 1 FROM reviews WHERE movie_id=?", (movie_id,)).fetchone() is not None
-        pending_fetch = (not has_actors or not has_magnets or not has_reviews) and not request.args.get("_auto")
+        # 磁链源：设置页「扩展磁链库」里启用且已填 API URL 模板的库 → 详情页「AVDB磁链」tab
+        srcs = [s for s in db.list_magnet_sources() if s.get("enabled") and s.get("api_url_template")]
+        lib_names = [(s.get("name") or s.get("id")) for s in srcs]
+        avdb_configured = bool(lib_names)
+        has_avdb = False
+        if lib_names:
+            _ph = ",".join("?" for _ in lib_names)
+            has_avdb = db.conn.execute(
+                f"SELECT 1 FROM magnets WHERE movie_id=? AND source IN ({_ph}) LIMIT 1",
+                (movie_id, *lib_names)).fetchone() is not None
+        pending_fetch = (not has_actors or not has_magnets or not has_reviews
+                         or (avdb_configured and not has_avdb)) and not request.args.get("_auto")
         if pending_fetch:
             threading.Thread(
                 target=_background_fetch_movie,
                 args=(cfg.get("db_path", "javdb.db"), movie_id, row["number"],
                       cfg.get("api_base") or None, cfg.get("javbus_base") or DEFAULT_JAVBUS,
-                      cfg.get("proxy") or ""),
+                      cfg.get("proxy") or "", int(cfg.get("magnet_timeout", 30))),
                 daemon=True,
             ).start()
 
@@ -991,14 +1037,29 @@ def create_app() -> Flask:
             "SELECT a.* FROM actors a JOIN movie_actors ma ON ma.actor_id=a.id WHERE ma.movie_id=?",
             (movie_id,),
         ).fetchall()
-        magnets = [dict(m) for m in db.conn.execute("SELECT * FROM magnets WHERE movie_id=?", (movie_id,)).fetchall()]
         pushed_set = db.pushed_magnet_set()
-        for m in magnets:
-            m["has_uc"] = 1 if is_uncensored(m.get("name")) else 0
-            m["has_cn"] = 1 if is_chinese(m.get("name")) else 0
-            m["pushed"] = 1 if m.get("magnet") in pushed_set else 0
-        # 破解版排最前，其次字幕版，其余按日期（倒序）
-        magnets.sort(key=lambda m: (m["has_uc"], m["has_cn"], m.get("date") or ""), reverse=True)
+
+        def _flag_sort(rows):
+            out = [dict(m) for m in rows]
+            for m in out:
+                m["has_uc"] = 1 if is_uncensored(m.get("name")) else 0
+                m["has_cn"] = 1 if is_chinese(m.get("name")) else 0
+                m["pushed"] = 1 if m.get("magnet") in pushed_set else 0
+            # 破解版排最前，其次字幕版，其余按日期（倒序）
+            out.sort(key=lambda m: (m["has_uc"], m["has_cn"], m.get("date") or ""), reverse=True)
+            return out
+
+        # 磁力链接 tab：显示全部（javbus + 各磁链库），不做来源过滤
+        magnet_row = db.conn.execute("SELECT * FROM magnets WHERE movie_id=?", (movie_id,)).fetchall()
+        if lib_names:
+            ph = ",".join("?" for _ in lib_names)
+            avdb_row = db.conn.execute(
+                f"SELECT * FROM magnets WHERE movie_id=? AND source IN ({ph})",
+                (movie_id, *lib_names)).fetchall()
+        else:
+            avdb_row = []
+        magnets = _flag_sort(magnet_row)
+        avdb_magnets = _flag_sort(avdb_row)
         rpage = max(1, request.args.get("rpage", 1, type=int))
         per_page = 15
         total_reviews = db.conn.execute(
@@ -1022,12 +1083,14 @@ def create_app() -> Flask:
         hits = sync.check_library(db, movie["number"] or "")
         return render_template(
             "detail.html", movie=movie, actors=actors, magnets=magnets, reviews=reviews, hits=hits,
+            avdb_magnets=avdb_magnets, avdb_configured=avdb_configured,
             comment_magnets=comment_magnets,
             pending_fetch=pending_fetch,
             fetching_detail=pending_fetch and not has_actors,
             fetching_magnets=pending_fetch and not has_magnets,
             fetching_reviews=pending_fetch and not has_reviews,
             rpage=rpage, total_reviews=total_reviews, total_pages=total_pages,
+            page_items=_page_window(rpage, total_pages),
             related_lists=related_lists, relative_movies=relative_movies,
             lib_codes=_lib_codes(db), active="index")
 
@@ -1101,6 +1164,8 @@ def create_app() -> Flask:
                                api_nodes=cfgmod.API_NODES, pan115=db.get_pan115_config(),
                                clouddrive2=db.get_clouddrive2_config(),
                                downloaders=db.list_downloaders(),
+                               magnet_timeout=cfg.get("magnet_timeout", 30),
+                               magnet_sources=db.list_magnet_sources(),
                                sync_cron=cfg.get("sync_cron", ""),
                                players=EXTERNAL_PLAYERS,
                                default_player=cfg.get("default_player", ""),
@@ -1163,6 +1228,7 @@ def create_app() -> Flask:
 
         return render_template("top250.html", movies=movies, actors=actors, error=error, page=page,
                                tab=tab, count=count, lib_codes=_lib_codes(db),
+                               page_items=_page_window(page, total_pages),
                                total_pages=total_pages, per_page=per_page, active="top250")
 
     @app.route("/search")
@@ -1174,6 +1240,7 @@ def create_app() -> Flask:
         filter_ = request.args.get("filter", "all")
         year = request.args.get("year", "")
         sort = request.args.get("sort", "release_date")
+        dir_ = request.args.get("dir", "desc")   # 排序方向：desc 倒序（默认）/ asc 顺序
         page = max(1, request.args.get("page", 1, type=int))
         type_label = {"actor": "演员", "series": "系列", "maker": "片商",
                       "director": "导演", "number": "番号", "label": "清单"}.get(stype, "影片")
@@ -1192,7 +1259,8 @@ def create_app() -> Flask:
 
         if not q:
             return render_template("search.html", movies=[], q="", type_label=type_label,
-                                   count=0, page=1, sort=sort, filter_=filter_, year=year,
+                                   count=0, page=1, sort=sort, dir_=dir_, filter_=filter_, year=year,
+                                   total_pages=1, page_items=[1],
                                    error=None, st=request.args.get("type", "number"), active="search")
 
         orig_type = request.args.get("type", "all")
@@ -1200,13 +1268,15 @@ def create_app() -> Flask:
             stype = "all"
         movies, error = [], None
         try:
-            sort_by = {"score": "score", "date": "date"}.get(sort, "relevance")
+            sort_by = {"release_date": "date", "score": "score"}.get(sort, "relevance")
+            # 上映日期按方向控制 from_recent：desc 最新优先 / asc 最早优先；其余排序维持原样
+            from_recent = "true" if (sort == "release_date" and dir_ == "desc") else "false"
             # 拉取该查询的全部结果（≤10 页 * 60），供本地二次过滤
             all_items, p = [], 1
             while p <= 10:
                 res = build_client(cfg).request("GET", "/v2/search", {
                     "q": q, "page": p, "type": "movie", "limit": 60, "movie_type": stype,
-                    "from_recent": "false", "movie_filter_by": "all", "movie_sort_by": sort_by,
+                    "from_recent": from_recent, "movie_filter_by": "all", "movie_sort_by": sort_by,
                 })
                 batch = (res.get("data") or {}).get("movies") or []
                 all_items.extend(batch)
@@ -1229,6 +1299,16 @@ def create_app() -> Flask:
                     continue
                 filtered.append(it)
 
+            # 本地排序：评分 / 上映日期，方向由 dir 决定（desc 倒序 / asc 顺序）；相关度保持官网顺序
+            if sort == "score":
+                def _score(it):
+                    r = db.conn.execute(
+                        "SELECT score FROM movies WHERE id=?", (it.get("id"),)).fetchone()
+                    return (r["score"] if r and r["score"] is not None else 0) or 0
+                filtered.sort(key=_score, reverse=(dir_ != "asc"))
+            elif sort == "release_date":
+                filtered.sort(key=lambda it: (it.get("release_date") or ""), reverse=(dir_ != "asc"))
+
             # 分页返回
             per = 24
             start = (page - 1) * per
@@ -1243,8 +1323,9 @@ def create_app() -> Flask:
 
         return render_template("search.html", movies=movies, q=q, type_label=type_label,
                                count=len(filtered) if not error else 0, page=page, sort=sort,
-                               filter_=filter_, year=year, error=error,
+                               dir_=dir_, filter_=filter_, year=year, error=error,
                                total_pages=((len(filtered) + 23) // 24) if not error else 1,
+                               page_items=_page_window(page, ((len(filtered) + 23) // 24) if not error else 1),
                                st=request.args.get("type", "number"), lib_codes=_lib_codes(db),
                                active="search")
 
@@ -1253,14 +1334,45 @@ def create_app() -> Flask:
         db = get_db()
         page = max(1, request.args.get("page", 1, type=int))
         per_page = 60
-        total = db.conn.execute("SELECT COUNT(*) FROM movies").fetchone()[0]
+        filter_ = request.args.get("filter", "all")
+        year = request.args.get("year", "")
+        sort = request.args.get("sort", "release_date")
+        dir_ = request.args.get("dir", "desc")
+        tag = request.args.get("tag", "").strip()
+        type_map = {"censored": 0, "uncensored": 1, "european": 2, "fc2": 3}
+
+        conds, params = [], []
+        if filter_ != "all" and filter_ in type_map:
+            conds.append("COALESCE(type, 0) = ?")
+            params.append(type_map[filter_])
+        if year:
+            conds.append("substr(release_date, 1, 4) = ?")
+            params.append(year)
+        if tag:
+            conds.append("EXISTS (SELECT 1 FROM json_each(movies.tags) je WHERE je.value = ?)")
+            params.append(tag)
+        where = (" WHERE " + " AND ".join(conds)) if conds else ""
+
+        total = db.conn.execute(f"SELECT COUNT(*) FROM movies{where}", params).fetchone()[0]
+        direction = "DESC" if dir_ != "asc" else "ASC"
+        if sort == "score":
+            order_clause = f"ORDER BY COALESCE(score, 0) {direction}"
+        elif sort == "release_date":
+            order_clause = f"ORDER BY release_date {direction}"
+        else:  # relevance / 默认：最近入库优先
+            order_clause = "ORDER BY id DESC"
+
         rows = db.conn.execute(
-            "SELECT * FROM movies ORDER BY release_date DESC LIMIT ? OFFSET ?",
-            (per_page, (page - 1) * per_page),
+            f"SELECT * FROM movies{where} {order_clause} LIMIT ? OFFSET ?",
+            params + [per_page, (page - 1) * per_page],
         ).fetchall()
         total_pages = max(1, (total + per_page - 1) // per_page)
+        page = min(page, total_pages)
         return render_template("library.html", movies=rows, page=page,
-                               total_pages=total_pages, total=total, lib_codes=_lib_codes(db), active="library")
+                               total_pages=total_pages, total=total, filter_=filter_, year=year,
+                               sort=sort, dir_=dir_, tag=tag,
+                               page_items=_page_window(page, total_pages),
+                               lib_codes=_lib_codes(db), active="library")
 
     @app.route("/want")
     def want_page():
@@ -1309,6 +1421,7 @@ def create_app() -> Flask:
                     pass
         return render_template("want.html", views=views, view=view, counts=counts,
                                items=items, page=page, total_pages=total_pages,
+                               page_items=_page_window(page, total_pages),
                                categories=_tag_vocabulary(db), active="want")
 
     @app.route("/follow")
@@ -1379,6 +1492,7 @@ def create_app() -> Flask:
             error = str(e)
         return render_template("list.html", movies=movies, name=name, error=error,
                                page=page, list_id=list_id, total=total, total_pages=total_pages,
+                               page_items=_page_window(page, total_pages),
                                filter_=filter_, year=year, sort=sort, lib_codes=_lib_codes(db), active="index")
 
     # ---------- 订阅管理 ----------
@@ -1857,6 +1971,15 @@ def create_app() -> Flask:
             movie = scrape.ingest_movie_id(build_client(cfg), db, mid)
             if data.get("magnets"):
                 scrape.ingest_magnets(build_javbus(cfg), db, movie["number"], mid)
+            # 自定义磁链库（AVdb 等）：重新获取时一并拉取该影片磁链
+            for lib in db.list_magnet_sources():
+                if lib.get("enabled") and lib.get("api_url_template"):
+                    try:
+                        # 磁链库（AVdb）为内网服务，不走全局代理
+                        scrape.ingest_source_magnets(lib, db, movie["number"], mid,
+                                                     int(cfg.get("magnet_timeout", 30)), None)
+                    except Exception:  # noqa: BLE001
+                        continue
             return jsonify(ok=True, id=mid, number=movie["number"])
         except Exception as e:  # noqa: BLE001
             return jsonify(ok=False, error=str(e)), 400
@@ -1875,6 +1998,214 @@ def create_app() -> Flask:
             return jsonify(ok=True, count=n)
         except Exception as e:  # noqa: BLE001
             return jsonify(ok=False, error=str(e)), 400
+
+    # ---- 自定义磁链库（设置页「扩展磁链库」） ----
+    def _magnet_lib_client(lib: dict) -> MagnetLibClient:
+        cfg = get_cfg()
+        return MagnetLibClient(
+            api_url_template=lib.get("api_url_template") or "",
+            headers=lib.get("headers") or [],
+            timeout=int(cfg.get("magnet_timeout", 30)),
+            proxy=None,   # 磁链库（AVdb）为内网服务，不走全局代理
+        )
+
+    def _lib_stats_url(db, lib) -> str:
+        url = lib.get("stats_api_url") or ""
+        if not url and lib.get("stats_source"):
+            ref = db.get_magnet_source(lib["stats_source"])
+            url = (ref or {}).get("stats_api_url") or ""
+        return url
+
+    def _fetch_stats_snapshot(db, cfg) -> dict:
+        """抓取所有启用统计的磁链库，汇总成一个 {total, groups:[{site,subtotal,items}], date} 快照。"""
+        libs = [l for l in db.list_magnet_sources() if l.get("enabled") and l.get("stats_enabled")]
+        total, groups, date = 0, {}, None
+        for lib in libs:
+            url = _lib_stats_url(db, lib)
+            if not url:
+                continue
+            try:
+                payload = _magnet_lib_client(lib).get_json(url)
+                if not isinstance(payload, dict):
+                    continue
+                g = parse_stats_groups(payload)
+            except Exception:  # noqa: BLE001
+                continue
+            total += g["total"]
+            for grp in g["groups"]:
+                gd = groups.setdefault(grp["site"], {})
+                gd.setdefault("items", {})
+                for it in grp["items"]:
+                    gd["items"][it["label"]] = gd["items"].get(it["label"], 0) + it["count"]
+            if g["date"] and not date:
+                date = g["date"]
+        groups_out = [{"site": k, "items": [{"label": lbl, "count": c} for lbl, c in v["items"].items()],
+                       "subtotal": sum(v["items"].values())} for k, v in groups.items()]
+        return {"total": total, "groups": groups_out, "date": date}
+
+    def _mstats_fingerprint(snap: dict) -> str:
+        s = json.dumps(snap, sort_keys=True, ensure_ascii=False)
+        return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+    @app.route("/api/magnet-sources")
+    def api_magnet_sources_list():
+        db = get_db()
+        cfg = get_cfg()
+        return jsonify(ok=True, timeout=int(cfg.get("magnet_timeout", 30)),
+                       sources=db.list_magnet_sources())
+
+    @app.route("/api/magnet-sources/config", methods=["POST"])
+    def api_magnet_sources_config():
+        db = get_db()
+        cfg = get_cfg()
+        data = request.get_json(force=True)
+        if "timeout" in data:
+            try:
+                cfg["magnet_timeout"] = max(1, int(data.get("timeout") or 30))
+            except (TypeError, ValueError):
+                cfg["magnet_timeout"] = 30
+        cfgmod.save(cfg, CONFIG_PATH)
+        db.replace_magnet_sources(data.get("sources") or [])
+        return jsonify(ok=True)
+
+    @app.route("/api/magnet-sources/order", methods=["POST"])
+    def api_magnet_sources_order():
+        db = get_db()
+        data = request.get_json(force=True)
+        for i, sid in enumerate(data.get("order") or [], start=1):
+            db.conn.execute("UPDATE magnet_sources SET sort_order=? WHERE id=?", (i, sid))
+        db.conn.commit()
+        return jsonify(ok=True)
+
+    @app.route("/api/magnet-sources/test", methods=["POST"])
+    def api_magnet_sources_test():
+        db = get_db()
+        data = request.get_json(force=True)
+        lib = data.get("source")
+        if not lib:
+            row = db.get_magnet_source(data.get("id") or "")
+            if not row:
+                return jsonify(ok=False, error="未找到该磁链库"), 400
+            lib = row
+        client = _magnet_lib_client(lib)
+        url = _lib_stats_url(db, lib) or client.build_url("TEST-001")
+        try:
+            ok, msg = client.test(url)
+        except MagnetLibError as e:
+            return jsonify(ok=False, error=str(e)), 400
+        return jsonify(ok=ok, msg=msg)
+
+    @app.route("/api/magnet-sources/stats")
+    def api_magnet_sources_stats():
+        db = get_db()
+        libs = [l for l in db.list_magnet_sources() if l.get("enabled") and l.get("stats_enabled")]
+        libraries, total = [], 0
+        for lib in libs:
+            url = _lib_stats_url(db, lib)
+            if not url:
+                continue
+            try:
+                cats, d = _magnet_lib_client(lib).fetch_stats(url)
+            except Exception:  # noqa: BLE001
+                cats, d = [], None
+            if not cats:
+                continue
+            total += sum(c["count"] for c in cats)
+            libraries.append({"id": lib.get("id"), "name": lib.get("name") or lib.get("id"),
+                              "date": d, "categories": cats})
+        return jsonify(ok=True, total=total, libraries=libraries)
+
+    def _build_history(db) -> list[dict]:
+        """把最近快照转成带 delta 的历史（老→新），供弹窗渲染。最旧一条无对比，delta=0。"""
+        snaps = list(reversed(db.list_magnet_stats(10)))  # 升序
+        history = []
+        prev = None
+        for s in snaps:
+            payload = s["payload"] or {}
+            groups = []
+            for grp in payload.get("groups", []):
+                prev_items = {}
+                pm = None
+                if prev:
+                    pg = next((x for x in prev["groups"] if x["site"] == grp["site"]), None)
+                    pm = pg
+                    prev_items = {i["label"]: i["count"] for i in (pg["items"] if pg else [])}
+                items = []
+                for it in grp["items"]:
+                    old = prev_items.get(it["label"], 0)
+                    items.append({"label": it["label"], "count": it["count"],
+                                  "delta": (it["count"] - old) if prev else 0})
+                groups.append({"site": grp["site"], "subtotal": grp["subtotal"],
+                               "delta": (grp["subtotal"] - (pm["subtotal"] if pm else 0)) if prev else 0,
+                               "items": items})
+            history.append({"ts": s["ts"], "total": s["total"],
+                            "delta": (s["total"] - prev["total"]) if prev else 0,
+                            "groups": groups})
+            prev = {"total": s["total"], "groups": groups}
+        return list(reversed(history))  # 新的在前
+
+    @app.route("/api/magnet-stats/history")
+    def api_magnet_stats_history():
+        db = get_db()
+        return jsonify(ok=True, history=_build_history(db))
+
+    @app.route("/api/magnet-stats/record", methods=["POST"])
+    def api_magnet_stats_record():
+        """手动记录一次快照（有变化才记，保留最近 10 次）。"""
+        db = get_db()
+        cfg = get_cfg()
+        snap = _fetch_stats_snapshot(db, cfg)
+        if not snap["groups"]:
+            return jsonify(ok=False, error="没有可记录的统计（需启用统计 API 并配置统计地址）"), 400
+        fp = _mstats_fingerprint(snap)
+        last = db.latest_magnet_stats()
+        if last and last["fingerprint"] == fp:
+            return jsonify(ok=True, changed=False, msg="统计无变化，未记录")
+        db.add_magnet_stats(datetime.now().isoformat(timespec="seconds"), snap["total"], fp, snap)
+        db.trim_magnet_stats(10)
+        return jsonify(ok=True, changed=True)
+
+    @app.route("/api/magnet-sources/fetch", methods=["POST"])
+    def api_magnet_sources_fetch():
+        db = get_db()
+        cfg = get_cfg()
+        data = request.get_json(force=True)
+        code = (data.get("code") or "").strip()
+        if not code:
+            return jsonify(ok=False, error="缺少番号"), 400
+        movie_id = data.get("movie_id") or None
+        try:
+            code, movie_id = _resolve_code_movie(build_client(cfg), db, code)
+        except Exception:  # noqa: BLE001 - 番号解析失败时保留原值
+            pass
+        sources = []
+        for lib in db.list_magnet_sources():
+            if not lib.get("enabled") or not lib.get("api_url_template"):
+                continue
+            n = scrape.ingest_source_magnets(lib, db, code, movie_id,
+                                             timeout=int(cfg.get("magnet_timeout", 30)),
+                                             proxy=None)  # 磁链库（AVdb）内网直连，不走全局代理
+            sources.append({"id": lib.get("id"), "name": lib.get("name") or lib.get("id"), "count": n})
+        return jsonify(ok=True, code=code, sources=sources, count=sum(s["count"] for s in sources))
+
+    @app.route("/api/magnet-sources", methods=["POST"])
+    def api_magnet_sources_add():
+        db = get_db()
+        sid = db.save_magnet_source(request.get_json(force=True))
+        return jsonify(ok=True, id=sid)
+
+    @app.route("/api/magnet-sources/<sid>", methods=["POST"])
+    def api_magnet_sources_update(sid):
+        db = get_db()
+        data = dict(request.get_json(force=True) or {})
+        data["id"] = sid
+        db.save_magnet_source(data)
+        return jsonify(ok=True)
+
+    @app.route("/api/magnet-sources/<sid>", methods=["DELETE"])
+    def api_magnet_sources_delete(sid):
+        ok = get_db().delete_magnet_source(sid)
+        return jsonify(ok=ok)
 
     @app.route("/api/magnet/push", methods=["POST"])
     def api_magnet_push():
@@ -1982,6 +2313,7 @@ def create_app() -> Flask:
         cur = db.get_pan115_config()
         cur.update({
             "cookie": data.get("cookie", cur.get("cookie", "")).strip(),
+            "app": (data.get("app") or cur.get("app") or "web").strip() or "web",
             "timeout": int(data.get("timeout", cur.get("timeout", 30)) or 30),
             "quota": int(data.get("quota", cur.get("quota", 0)) or 0),
             "target_cid": data.get("target_cid", cur.get("target_cid", "")).strip(),
@@ -1990,6 +2322,47 @@ def create_app() -> Flask:
         })
         db.save_pan115_config(cur)
         return jsonify(ok=True)
+
+    @app.route("/api/pan115/qr/start", methods=["POST"])
+    def api_pan115_qr_start():
+        # app 参数接受但当前仅用于占位，客户端的真正选择在 result 步生效
+        try:
+            res = pan115.start_qrcode_login()
+            return jsonify(ok=True, uid=res["uid"], token=res["token"], qr=res["qr"])
+        except pan115.Pan115Error as e:
+            return jsonify(ok=False, error=str(e)), 400
+        except Exception as e:  # noqa: BLE001
+            return jsonify(ok=False, error=str(e)), 400
+
+    @app.route("/api/pan115/qr/poll", methods=["POST"])
+    def api_pan115_qr_poll():
+        data = request.get_json(silent=True) or {}
+        token = data.get("token") or {}
+        if not isinstance(token, dict) or not token.get("uid"):
+            return jsonify(ok=False, error="缺少 token"), 400
+        try:
+            r = pan115.poll_qrcode_login(token)
+            return jsonify(ok=True, status=r["status"], msg=r["msg"])
+        except pan115.Pan115Error as e:
+            return jsonify(ok=False, error=str(e)), 400
+        except Exception as e:  # noqa: BLE001
+            return jsonify(ok=False, error=str(e)), 400
+
+    @app.route("/api/pan115/qr/result", methods=["POST"])
+    def api_pan115_qr_result():
+        data = request.get_json(silent=True) or {}
+        token = data.get("token") or {}
+        uid = str(token.get("uid")) if isinstance(token, dict) else (data.get("uid") or "").strip()
+        app = (data.get("app") or "web").strip() or "web"
+        if not uid:
+            return jsonify(ok=False, error="缺少 uid"), 400
+        try:
+            cookie = pan115.finish_qrcode_login(uid, app=app)
+            return jsonify(ok=True, cookie=cookie, msg="扫码登录成功")
+        except pan115.Pan115Error as e:
+            return jsonify(ok=False, error=str(e)), 400
+        except Exception as e:  # noqa: BLE001
+            return jsonify(ok=False, error=str(e)), 400
 
     @app.route("/api/clouddrive2/test", methods=["POST"])
     def api_clouddrive2_test():
@@ -2138,6 +2511,27 @@ def create_app() -> Flask:
     def api_push_delete(pid):
         get_db().delete_push(pid)
         return jsonify(ok=True)
+
+    def _stats_recorder_loop():
+        """轮询磁链库统计，数据有变化才记录，只保留最近 10 次（2.png 历史纪录）。"""
+        interval = int(cfg.get("magnet_stats_interval", 1800)) or 1800
+        while True:
+            time.sleep(interval)
+            try:
+                dbx = Database(cfg.get("db_path", "javdb.db"))
+                snap = _fetch_stats_snapshot(dbx, cfg)
+                if snap["groups"]:
+                    fp = _mstats_fingerprint(snap)
+                    last = dbx.latest_magnet_stats()
+                    if (not last) or last["fingerprint"] != fp:
+                        dbx.add_magnet_stats(datetime.now().isoformat(timespec="seconds"),
+                                             snap["total"], fp, snap)
+                        dbx.trim_magnet_stats(10)
+                dbx.close()
+            except Exception:  # noqa: BLE001
+                pass
+
+    threading.Thread(target=_stats_recorder_loop, daemon=True).start()
 
     start_sync_scheduler()
     start_push_verify_worker()

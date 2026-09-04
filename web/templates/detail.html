@@ -101,7 +101,7 @@
       <div class="dbs-card-title">{{ icon('folder') }} 类别</div>
       {% if movie['tags_list'] %}
       <div class="tag-chips">
-        {% for t in movie['tags_list'] %}<span class="tag-chip">{{ t }}</span>{% endfor %}
+        {% for t in movie['tags_list'] %}<a class="tag-chip" href="/library?tag={{ t | urlencode }}" title="查看影库中含「{{ t }}」标签的影片">{{ t }}</a>{% endfor %}
       </div>
       {% else %}
       <div class="empty-hint">暂无标签。</div>
@@ -151,10 +151,11 @@
 
 <div class="detail-section detail-full">
   <div class="tab-header">
-    <button type="button" class="tab-btn active" data-tab="magnets" onclick="switchTab('magnets')">{{ icon('link', 15) }} 磁力链接（{{ magnets|length }}）</button>
-    <button type="button" class="tab-btn" data-tab="ed2k" onclick="switchTab('ed2k')">{{ icon('share', 15) }} 评论区分享（{{ comment_magnets|length }}）</button>
-    <button type="button" class="tab-btn" data-tab="related" onclick="switchTab('related')">{{ icon('folder', 15) }} 关联清单（{{ related_lists|length }}）</button>
-    <button type="button" class="tab-btn" data-tab="reviews" onclick="switchTab('reviews')">{{ icon('list', 15) }} 评论（{{ total_reviews }}）</button>
+    <button type="button" class="tab-btn active" data-tab="magnets" onclick="switchTab('magnets')">{{ icon('link', 15) }}<span class="tab-label"><span class="tab-name">磁力链接</span><span class="tab-count">{{ magnets|length }}</span></span></button>
+    <button type="button" class="tab-btn" data-tab="avdb" onclick="switchTab('avdb')">{{ icon('database', 15) }}<span class="tab-label"><span class="tab-name">AVDB磁链</span><span class="tab-count">{{ avdb_magnets|length }}</span></span></button>
+    <button type="button" class="tab-btn" data-tab="ed2k" onclick="switchTab('ed2k')">{{ icon('share', 15) }}<span class="tab-label"><span class="tab-name">评论区分享</span><span class="tab-count">{{ comment_magnets|length }}</span></span></button>
+    <button type="button" class="tab-btn" data-tab="related" onclick="switchTab('related')">{{ icon('folder', 15) }}<span class="tab-label"><span class="tab-name">关联清单</span><span class="tab-count">{{ related_lists|length if related_lists|length < 50 else '50+' }}</span></span></button>
+    <button type="button" class="tab-btn" data-tab="reviews" onclick="switchTab('reviews')">{{ icon('list', 15) }}<span class="tab-label"><span class="tab-name">评论</span><span class="tab-count">{{ total_reviews }}</span></span></button>
   </div>
 
   <div class="tab-panel" id="tab-magnets">
@@ -185,6 +186,40 @@
     <div class="loading-hint"><span class="spinner"></span>正在加载磁链...</div>
     {% else %}
     <div class="empty-card" style="padding:1.5rem;">暂无磁链，点击上方「重新获取」或到 JAVBUS 获取。</div>
+    {% endif %}
+  </div>
+
+  <div class="tab-panel" id="tab-avdb" style="display:none;">
+    {% if avdb_configured %}
+    <p class="mg-note">{{ icon('info', 13) }} 以下磁链来自设置页「扩展磁链库」配置的磁链源。</p>
+    {% if avdb_magnets %}
+    {% for mg in avdb_magnets %}
+    <div class="magnet-card">
+      <div class="mg-top">
+        <span class="mg-size">{{ mg['size'] or '—' }}</span>
+        <span class="mg-extra">{{ icon('link', 13) }} AVDB 磁链</span>
+        <span class="mg-date">{{ mg['date'] or '' }}</span>
+      </div>
+      <div class="mg-name" title="{{ mg['name'] }}">{{ mg['name'] }}</div>
+      <div class="mg-foot">
+        <div class="mg-tags">
+          <span class="mg-badge {{ 'on' if mg['has_hd'] else 'off' }}">HD</span>
+          <span class="mg-badge {{ 'on' if mg['has_cn'] else 'off' }}">字幕</span>
+          <span class="mg-badge {{ 'break' if mg['has_uc'] else 'off' }}">破解</span>
+        </div>
+        <div class="mg-actions">
+          {% if mg['pushed'] %}<span class="badge push-done">已推送</span>{% endif %}
+          <button class="copy-btn" data-magnet="{{ mg['magnet'] }}" onclick="copyMagnet(this)">{{ icon('copy', 13) }} 复制</button>
+          <button class="push-btn" data-magnet="{{ mg['magnet'] }}" data-name="{{ mg['name'] }}" data-size="{{ mg['size'] }}" data-movie="{{ movie['id'] }}" data-code="{{ mg['code'] }}" onclick="pushMagnet(this)">{{ icon('send', 13) }} 推送</button>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-card" style="padding:1.5rem;">暂无 AVDB 磁链，打开页面会自动抓取。</div>
+    {% endif %}
+    {% else %}
+    <div class="empty-card" style="padding:1.5rem;">尚未配置 AVDB 磁链源，请到「设置 → 其它 → 扩展磁链库」开启并填写接口地址与 API Key。</div>
     {% endif %}
   </div>
 
@@ -255,10 +290,22 @@
       {% endfor %}
     </div>
     {% if total_pages > 1 %}
-    <div class="pagination">
-      {% if rpage > 1 %}<a class="page-btn" href="?rpage={{ rpage - 1 }}">← 上一页</a>{% else %}<span class="page-btn disabled">← 上一页</span>{% endif %}
+    <div class="pagination rank-pagination">
+      {% set base = '?rpage=' %}
+      {% if rpage > 1 %}<a class="page-btn" href="{{ base }}{{ rpage - 1 }}">← 上一页</a>{% else %}<span class="page-btn disabled">← 上一页</span>{% endif %}
+      <div class="page-numbers" aria-label="分页">
+        {% for p in page_items %}
+        {% if p is none %}<span class="page-gap">…</span>
+        {% else %}<a class="page-number {{ 'active' if p == rpage }}" href="{{ base }}{{ p }}">{{ p }}</a>{% endif %}
+        {% endfor %}
+      </div>
       <span class="page-info">第 {{ rpage }} / {{ total_pages }} 页</span>
-      {% if rpage < total_pages %}<a class="page-btn" href="?rpage={{ rpage + 1 }}">下一页 →</a>{% else %}<span class="page-btn disabled">下一页 →</span>{% endif %}
+      {% if rpage < total_pages %}<a class="page-btn" href="{{ base }}{{ rpage + 1 }}">下一页 →</a>{% else %}<span class="page-btn disabled">下一页 →</span>{% endif %}
+      <form class="page-jump" action="" method="get">
+        <label for="review-page-jump">跳转到</label>
+        <input id="review-page-jump" name="rpage" type="number" min="1" max="{{ total_pages }}" value="{{ rpage }}" aria-label="跳转页码">
+        <button type="submit">页</button>
+      </form>
     </div>
     {% endif %}
     {% elif fetching_reviews %}

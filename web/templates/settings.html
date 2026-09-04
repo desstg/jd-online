@@ -57,6 +57,58 @@
   .sub-field-hint { font-size:0.72rem; color:var(--text-muted); }
   .sub-foot { display:flex; justify-content:flex-end; gap:0.6rem; margin-top:1rem; }
   .sub-foot .glass-button { border-radius:0.5rem; }
+  /* —— 扩展磁链库（1.png） —— */
+  #panel-magnetlib .ml-section-head, #panel-magnetlib .ml-stats-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; }
+  #panel-magnetlib .ml-section-head .section-title, #panel-magnetlib .ml-stats-head .section-title { margin-bottom:0; }
+  .ml-total { color:var(--text-muted); font-weight:400; font-size:0.85rem; }
+  .ml-history { color:var(--accent); font-size:0.82rem; cursor:pointer; background:transparent; border:none; display:inline-flex; align-items:center; gap:0.3rem; padding:0; }
+  .ml-card { border:1px solid var(--border); border-radius:12px; margin-bottom:1rem; background:transparent; overflow:hidden; }
+  .ml-head { display:flex; align-items:center; gap:0.6rem; padding:0.7rem 1rem; cursor:pointer; background:transparent; }
+  .ml-title { font-weight:600; display:flex; align-items:center; gap:0.5rem; min-width:0; }
+  .ml-tools { margin-left:auto; display:flex; align-items:center; gap:0.5rem; }
+  .ml-on { background:rgba(0,191,165,0.12); color:var(--accent); border-radius:999px; padding:0.15rem 0.6rem; font-size:0.75rem; }
+  .ml-off { background:rgba(0,0,0,0.05); color:var(--text-muted); border-radius:999px; padding:0.15rem 0.6rem; font-size:0.75rem; }
+  .ml-body { padding:0.9rem 1rem 1.1rem; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0.9rem 1rem; }
+  .ml-body .form-row { margin-bottom:0; }
+  .ml-field-full { grid-column:1 / -1; }
+  .ml-hdr-block { display:block !important; }   /* 请求头区改为块级，避免 flex 子项塌缩成窄条 */
+  .ml-hdr-block .ml-header-row { display:flex; align-items:center; gap:0.6rem; margin-bottom:0.5rem; }
+  .ml-hdr-block .ml-header-row .glass-input { flex:1 1 0; min-width:0; }
+  .ml-hdr-block .ml-header-row .glass-input:first-child { flex:0 1 200px; min-width:0; }
+  .ml-hdr-block .ml-header-row .ml-hdr-x { flex:0 0 auto; }
+  .ml-hdr-x { cursor:pointer; color:var(--text-muted); border:none; background:transparent; padding:0.2rem 0.4rem; }
+  .ml-hdr-x:hover { color:#dc2626; }
+  .ml-switch-label label { font-weight:500; }
+  .ml-stats-empty, .ml-hint { font-size:0.78rem; color:var(--text-muted); }
+  .ml-stats-chips { display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem; }
+  .ml-chip { border:1px solid var(--border); border-radius:0.5rem; padding:0.35rem 0.7rem; font-size:0.82rem; background:#fff; color:var(--text-main); }
+  .ml-chip b { color:var(--accent); font-family:var(--mono); margin-left:0.3rem; }
+  .ml-stats-block { margin-bottom:1rem; }
+  .ml-stats-block-head { display:flex; align-items:baseline; gap:0.6rem; margin-bottom:0.5rem; font-weight:600; }
+  .ml-stats-date { font-size:0.72rem; color:var(--text-muted); font-weight:400; }
+  .ml-sep { border-top:1px solid var(--border); padding-top:0.9rem; }
+  .ml-foot { display:flex; justify-content:flex-end; gap:0.6rem; margin-top:0.6rem; }
+  .ml-foot .glass-button { border-radius:0.5rem; }
+  .ml-chev { display:inline-flex; font-size:0.8rem; color:var(--text-muted); transition:transform 0.15s; }
+  .ml-card:not(.collapsed) .ml-chev { transform:rotate(90deg); }
+  .ml-card.collapsed .ml-body { display:none; }
+  .ml-tag { color:var(--text-muted); font-size:0.72rem; background:var(--bg); border:1px solid var(--border); border-radius:0.3rem; padding:0.05rem 0.35rem; }
+  /* —— 磁链库历史纪录模态（2.png） —— */
+  #magnet-history-body .mstr-item { margin-bottom:1.1rem; }
+  #magnet-history-body .mstr-time { display:flex; align-items:center; gap:0.5rem; color:var(--text-secondary); font-size:0.85rem; margin-bottom:0.6rem; }
+  #magnet-history-body .mstr-total { display:flex; align-items:center; justify-content:flex-end; gap:0.5rem; font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.6rem; }
+  #magnet-history-body .mstr-total b { color:var(--accent); font-family:var(--mono); }
+  #magnet-history-body .mstr-group { border:1px solid var(--border); border-radius:0.6rem; padding:0.6rem 0.8rem; margin-bottom:0.7rem; background:#fff; }
+  #magnet-history-body .mstr-site { display:flex; align-items:center; justify-content:space-between; font-weight:600; font-size:0.85rem; margin-bottom:0.5rem; color:var(--text-main); }
+  #magnet-history-body .mstr-subtotal { font-weight:400; color:var(--text-secondary); font-family:var(--mono); }
+  #magnet-history-body .mstr-chips { display:flex; flex-wrap:wrap; gap:0.4rem; }
+  #magnet-history-body .mstr-chip { border:1px solid var(--border); border-radius:0.4rem; padding:0.3rem 0.6rem; font-size:0.78rem; background:#fff; color:var(--text-main); }
+  #magnet-history-body .mstr-chip b { color:var(--text-main); font-family:var(--mono); margin:0 0.2rem 0 0.3rem; }
+  #magnet-history-body .mstr-delta { font-size:0.72rem; font-family:var(--mono); margin-left:0.2rem; }
+  #magnet-history-body .mstr-delta.pos { color:#12b76a; }
+  #magnet-history-body .mstr-delta.neg { color:#dc2626; }
+  #magnet-history-body .mstr-delta.zero { color:var(--text-muted); }
+  @media (max-width:768px){ .ml-body { grid-template-columns:1fr; } .ml-header-row .glass-input:first-child { flex:1 1 100%; } .ml-header-row { flex-wrap:wrap; } }
 </style>
 
 <!-- 手机端设置详情视图头：导航条下方「‹ 返回 + 标题」，点菜单项后显示 -->
@@ -103,6 +155,12 @@
         <a class="side-item side-sub" data-target="notify">{{ icon('bell', 15) }} 通知</a>
       </div>
     </div>
+    <div class="side-group" data-group="other">
+      <span class="side-item">{{ icon('database', 16) }} 其它 <span class="group-chev">{{ icon('chevron-down', 13) }}</span></span>
+      <div class="side-subs">
+        <a class="side-item side-sub" data-target="magnetlib">{{ icon('link', 15) }} 扩展磁链库</a>
+      </div>
+    </div>
   </aside>
 
   <main class="settings-main">
@@ -126,7 +184,7 @@
         <div class="form-row">
           <label>JAVBUS 域名</label>
           <input class="glass-input" id="set-javbus" value="{{ cfg.get('javbus_base','') }}" placeholder="https://www.javbus.com">
-          <span class="form-hint">JAVBUS 经常换域名，抓磁链失败时改这里。</span>
+          <span class="form-hint" style="white-space:nowrap;">JAVBUS 经常换域名，抓磁链失败时改这里。</span>
         </div>
         <div class="form-row">
           <label>请求限流间隔（秒）</label>
@@ -144,7 +202,7 @@
         <div class="form-row">
           <label>网络代理（可选）</label>
           <input class="glass-input" id="set-proxy" value="{{ cfg.get('proxy','') }}" placeholder="如 http://127.0.0.1:7890">
-          <span class="form-hint">所有 JAVDB / JAVBUS 请求走此代理；图片（封面/预览图）本地解码可直连。</span>
+          <span class="form-hint" style="white-space:nowrap;">所有 JAVDB / JAVBUS 请求走此代理；图片（封面/预览图）本地解码可直连。</span>
         </div>
         <div class="form-row">
           <label>图片线路</label>
@@ -339,9 +397,27 @@
           <label class="switch-label"><input type="checkbox" id="p115-enabled" {{ 'checked' if pan115['enabled'] }}> 已启用</label>
         </div>
         <div class="form-row">
+          <label>登录设备类型</label>
+          <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
+            <select class="glass-input" id="p115-app" style="max-width:220px;">
+              <option value="web" {{ 'selected' if pan115.get('app')=='web' }}>115生活_网页端</option>
+              <option value="ios" {{ 'selected' if pan115.get('app')=='ios' }}>115生活_苹果端</option>
+              <option value="115ios" {{ 'selected' if pan115.get('app')=='115ios' }}>115_苹果端</option>
+              <option value="android" {{ 'selected' if pan115.get('app')=='android' }}>115生活_安卓端</option>
+              <option value="115android" {{ 'selected' if pan115.get('app')=='115android' }}>115_安卓端</option>
+              <option value="tv" {{ 'selected' if pan115.get('app')=='tv' }}>115生活_安卓电视端</option>
+              <option value="qandroid" {{ 'selected' if pan115.get('app')=='qandroid' }}>115管理_安卓端</option>
+              <option value="os_windows" {{ 'selected' if pan115.get('app')=='os_windows' }}>115生活_Windows端</option>
+              <option value="wechatmini" {{ 'selected' if pan115.get('app')=='wechatmini' }}>115生活_微信小程序端</option>
+              <option value="alipaymini" {{ 'selected' if pan115.get('app')=='alipaymini' }}>115生活_支付宝小程序</option>
+              <option value="harmony" {{ 'selected' if pan115.get('app')=='harmony' }}>115_鸿蒙端</option>
+            </select>
+            <button type="button" class="glass-button ghost" onclick="openQrLogin()">{{ icon('key', 15) }} 扫码登入</button>
+          </div>
+        </div>
+        <div class="form-row">
           <label>115 Cookie</label>
-          <input class="glass-input" id="p115-cookie" type="password" value="{{ pan115['cookie'] }}" placeholder="从浏览器登录 115 后复制 Cookie">
-          <span class="form-hint">用于身份认证，从浏览器获取 115 网盘的 Cookie（浏览器 F12 → Network → 复制请求头 Cookie）。</span>
+          <textarea class="glass-input" id="p115-cookie" rows="3" placeholder="从浏览器登录 115 后复制 Cookie"></textarea>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
           <div class="form-row"><label>超时时间（秒）</label><input class="glass-input" id="p115-timeout" type="number" min="0" value="{{ pan115['timeout'] }}"></div>
@@ -355,7 +431,7 @@
             <select class="glass-input dir-sel" id="p115-dir-sel" onchange="pickSelect(this)"></select>
             <button type="button" class="glass-button" style="font-size:0.82rem;padding:0.4rem 0.8rem;" onclick="setAsTarget()">选此目录</button>
           </div>
-          <span class="form-hint">当前：<span id="p115-target-cid">{{ pan115['target_cid'] }}</span> <span id="p115-target-name">{{ pan115['target_name'] }}</span></span>
+          <span class="form-hint" style="display:flex;align-items:center;gap:0.35rem;white-space:nowrap;">当前：<span id="p115-target-cid">{{ pan115['target_cid'] }}</span><span id="p115-target-name">{{ pan115['target_name'] }}</span></span>
         </div>
         <div style="display:flex;gap:0.6rem;">
           <button type="button" class="glass-button" onclick="testPan115()">{{ icon('activity', 15) }} 测试连接</button>
@@ -427,14 +503,74 @@
             <option value="{{ p['key'] }}" {{ 'selected' if (default_player or players[0]['key']) == p['key'] }}>{{ p['label'] }}</option>
             {% endfor %}
           </select>
-          <span class="form-hint">通过系统 URL scheme 唤起本地播放器；若协议未注册，播放键菜单内仍可「复制播放地址」。</span>
+          <span class="form-hint" style="white-space:nowrap;">通过系统 URL scheme 唤起本地播放器；若协议未注册，播放键菜单内仍可「复制播放地址」。</span>
         </div>
         <button class="glass-button" onclick="saveCfg({default_player: v('set-default-player')})">{{ icon('check', 15) }} 保存</button>
       </div>
     </div>
 
     <div class="panel" id="panel-notify">{{ placeholder('通知设置暂未接入。') }}</div>
+
+    <div class="panel" id="panel-magnetlib">
+      <div class="detail-section">
+        <div class="section-title" style="display:flex;align-items:center;gap:0.5rem;">
+          {{ icon('database', 18) }} <span>自定义磁链库</span> <span class="badge cd2-hot">新建</span>
+        </div>
+
+        <div class="form-row" style="margin-top:1rem;">
+          <label>超时时间（秒）</label>
+          <input class="glass-input" id="ml-timeout" type="number" min="1" value="{{ magnet_timeout }}" style="max-width:220px;">
+        </div>
+
+        <div class="ml-section-head">
+          <div class="section-title" style="margin-bottom:0;">{{ icon('list', 16) }} 自定义磁链库列表</div>
+          <button type="button" class="glass-button" onclick="addMagnetLib()">{{ icon('plus', 14) }} 添加磁链库</button>
+        </div>
+        <div id="ml-list"></div>
+
+        <div class="ml-stats-head">
+          <div class="section-title" style="margin-bottom:0;display:flex;align-items:center;gap:0.5rem;">
+            {{ icon('activity', 18) }} 磁链库统计 <span class="ml-total" id="ml-total">共 0 条</span>
+          </div>
+          <button type="button" class="ml-history" title="历史纪录" onclick="openMagnetHistory()">{{ icon('clock', 14) }} 历史纪录</button>
+        </div>
+        <div id="ml-stats" class="ml-hint">暂无统计（启用统计 API 并配置统计地址后在此显示）。</div>
+
+        <div class="ml-foot">
+          <button type="button" class="glass-button" onclick="saveMagnetLibs()">{{ icon('save', 14) }} 保存配置</button>
+          <button type="button" class="glass-button ghost" onclick="reloadMagnetLibs()">{{ icon('refresh', 14) }} 重新加载</button>
+        </div>
+      </div>
+    </div>
   </main>
+</div>
+
+<div class="modal-overlay want-modal-overlay" id="p115-qr-modal" hidden>
+  <div class="modal" style="width:340px;">
+    <div class="modal-header">
+      <div><h2>扫码登入 115</h2><p id="p115-qr-sub">请用所选客户端扫码</p></div>
+      <button class="icon-btn" type="button" onclick="closeQrLogin()">{{ icon('x', 16) }}</button>
+    </div>
+    <div class="modal-body" style="text-align:center;">
+      <img id="p115-qr-img" alt="登录二维码" style="width:240px;height:240px;object-fit:contain;image-rendering:auto;">
+      <p id="p115-qr-status" style="margin-top:0.8rem;color:var(--text-secondary);">等待扫码…</p>
+      <button type="button" class="glass-button ghost" style="margin-top:0.4rem;" onclick="openQrLogin()">刷新二维码</button>
+    </div>
+    <div class="modal-footer"><button class="glass-button ghost" type="button" onclick="closeQrLogin()">关闭</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay want-modal-overlay" id="magnet-history-modal" hidden>
+  <div class="modal" style="width:660px;max-width:92vw;">
+    <div class="modal-header">
+      <div><h2>{{ icon('activity', 18) }} 磁链库历史纪录</h2></div>
+      <button class="icon-btn" type="button" onclick="closeMagnetHistory()">{{ icon('x', 16) }}</button>
+    </div>
+    <div class="modal-body" id="magnet-history-body" style="max-height:70vh;overflow:auto;">
+      <div class="ml-hint">暂无历史纪录（开启统计后，数据有变化时自动记录，最多保留最近 10 次）。</div>
+    </div>
+    <div class="modal-footer"><button class="glass-button ghost" type="button" onclick="closeMagnetHistory()">关闭</button></div>
+  </div>
 </div>
 {% endblock %}
 
@@ -470,6 +606,7 @@ async function saveBasic() {
     items.forEach(function (it) { it.classList.toggle('active', it.dataset.target === target); });
     panels.forEach(function (p) { p.classList.toggle('active', p.id === 'panel-' + target); });
     if (target === 'mediaserver') loadSyncStats();
+    if (target === 'magnetlib') loadMagnetStats();
     try { localStorage.setItem('jd_settings_panel', target); } catch (e) {}
   }
   // 手机端：进详情 → 给 .settings-page 加 detail-open 类（CSS 控制菜单/面板显隐）
@@ -520,13 +657,19 @@ async function saveBasic() {
   });
   var saved = null;
   try { saved = localStorage.getItem('jd_settings_panel'); } catch (e) {}
+  // URL hash（如 #mediaserver）优先于 localStorage：从首页「同步媒体库」直达媒体服务器面板
+  var hashTarget = (location.hash || '').replace(/^#/, '');
+  var hashItem = (hashTarget && document.querySelector('.side-item[data-target="' + hashTarget + '"]')) ? hashTarget : null;
+  var preferred = hashItem || saved;
   var first = document.querySelector('.settings-side .side-item[data-target]');
-  var target = (saved && document.querySelector('.side-item[data-target="' + saved + '"]')) ? saved : (first ? first.dataset.target : null);
+  var target = (preferred && document.querySelector('.side-item[data-target="' + preferred + '"]')) ? preferred : (first ? first.dataset.target : null);
   if (isMobile()) {
     // 手机上默认只显示菜单列表（移除 detail-open、隐藏所有 panel）
     document.querySelectorAll('.settings-page').forEach(function (pg) { pg.classList.remove('detail-open'); });
     panels.forEach(function (p) { p.classList.remove('active'); });
     if (head) head.hidden = true;
+    // 带 hash 进入时，直接打开对应面板详情
+    if (hashItem) { var it = document.querySelector('.side-item[data-target="' + hashItem + '"]'); if (it) showDetail(it); }
   } else if (target) {
     activate(target);
   }
@@ -577,6 +720,181 @@ async function loadSyncStats() {
   } catch (e) { el.textContent = '加载失败'; }
 }
 
+// —— 自定义磁链库（设置页「扩展磁链库」，1.png） ——
+window.MAGNET_DATA = {{ magnet_sources|tojson }};
+var ML_SOURCES = (window.MAGNET_DATA || []).map(function (s) {
+  return Object.assign({id:'', name:'', api_url_template:'', headers:[], stats_enabled:0,
+                        stats_api_url:'', stats_source:'', enabled:1, sort_order:0}, s);
+});
+function mlEsc(t) {
+  return String(t == null ? '' : t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function mlName(s) { return s.name || s.id || '未命名'; }
+function renderMagnetLibs() {
+  var wrap = document.getElementById('ml-list');
+  if (!wrap) return;
+  if (!ML_SOURCES.length) { wrap.innerHTML = '<div class="ml-hint">还没有磁链库，点击「添加磁链库」创建。</div>'; return; }
+  var html = '';
+  ML_SOURCES.forEach(function (s, idx) {
+    var headers = (s.headers || []).map(function (h, i) {
+      return '<div class="ml-header-row">' +
+        '<input class="glass-input" value="' + mlEsc(h.name) + '" placeholder="Header 名（如 X-API-Key）" oninput="ML_SOURCES[' + idx + '].headers[' + i + '].name=this.value">' +
+        '<input class="glass-input" value="' + mlEsc(h.value) + '" placeholder="Header 值" oninput="ML_SOURCES[' + idx + '].headers[' + i + '].value=this.value">' +
+        '<button type="button" class="ml-hdr-x" title="删除请求头" onclick="removeHeaderRow(' + idx + ',' + i + ')">{{ icon('x', 14) }}</button>' +
+      '</div>';
+    }).join('');
+    html += '<div class="ml-card" data-idx="' + idx + '">' +
+      '<div class="ml-head" onclick="toggleCard(this)">' +
+        '<span class="ml-chev">{{ icon('chevron-right', 13) }}</span>' +
+        '<span class="ml-title">{{ icon('link', 15) }} ' + mlEsc(mlName(s)) + ' <span class="ml-tag">' + mlEsc(s.id||'') + '</span></span>' +
+        '<div class="ml-tools" onclick="event.stopPropagation()">' +
+          (s.enabled ? '<span class="ml-on">已启用</span>' : '<span class="ml-off">已停用</span>') +
+          '<button type="button" class="icon-btn" title="测试连接" onclick="testMagnetLib(' + idx + ')">{{ icon('activity', 14) }}</button>' +
+          '<button type="button" class="icon-btn" title="上移" onclick="moveLib(' + idx + ',-1)">{{ icon('chevron-down', 14) }}</button>' +
+          '<button type="button" class="icon-btn" title="删除" onclick="removeMagnetLib(' + idx + ')">{{ icon('trash', 14) }}</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="ml-body">' +
+        '<div class="form-row"><label>库 ID</label><input class="glass-input" value="' + mlEsc(s.id) + '" placeholder="留空自动生成" oninput="ML_SOURCES[' + idx + '].id=this.value"></div>' +
+        '<div class="form-row"><label>库名称</label><input class="glass-input" value="' + mlEsc(s.name) + '" placeholder="如 avdb" oninput="ML_SOURCES[' + idx + '].name=this.value"></div>' +
+        '<div class="form-row ml-field-full"><label>API URL 模板</label><input class="glass-input" value="' + mlEsc(s.api_url_template) + '" placeholder="https://HOST:8000/api/v1/articles/torrents?keyword={code}" oninput="ML_SOURCES[' + idx + '].api_url_template=this.value"><span class="form-hint" style="white-space:nowrap;">示例：https://api.example.com/api/{code} 或 https://api.example.com/api/{key}/{code}</span></div>' +
+        '<div class="form-row ml-field-full ml-hdr-block"><label>自定义请求头</label>' + headers +
+          '<button type="button" class="glass-button" style="font-size:0.8rem;padding:0.32rem 0.7rem;white-space:nowrap;display:inline-flex;align-items:center;gap:0.3rem;flex-shrink:0;" onclick="addHeaderRow(' + idx + ')">{{ icon('plus', 13) }} 添加请求头</button>' +
+          '<span class="form-hint" style="margin-left:0.5rem;">示例：X-API-Key: your-api-key-here 或 Authorization: Bearer xxx</span>' +
+        '</div>' +
+        '<div class="form-row ml-field-full ml-sep"><label>启用统计 API</label><label class="switch-label"><input type="checkbox" ' + (s.stats_enabled?'checked':'') + ' onchange="toggleStats(this,' + idx + ')"> 已启用</label></div>' +
+        '<div class="form-row ml-field-full"><label>统计 API URL</label><input class="glass-input" value="' + mlEsc(s.stats_api_url) + '" placeholder="https://HOST:8000/api/v1/stats" oninput="ML_SOURCES[' + idx + '].stats_api_url=this.value"><span class="form-hint" style="white-space:nowrap;">请填写指向您实例的统计数据接口地址，示例：https://api.example.com/api/v1/stats</span></div>' +
+        '<div class="form-row ml-field-full"><label>统计来源</label><select class="glass-input" onchange="ML_SOURCES[' + idx + '].stats_source=this.value"><option value="">（无）</option>' +
+          ML_SOURCES.map(function (o, oi) { return '<option value="' + mlEsc(o.id) + '"' + (String(o.id) === String(s.stats_source) ? ' selected' : '') + '>' + mlEsc(o.name || o.id || ('库' + (oi+1))) + '</option>'; }).join('') +
+        '</select><span class="form-hint" style="white-space:nowrap;">引用另一个磁链库的统计接口</span></div>' +
+        '<div class="form-row ml-field-full"><label>启用该库</label><label class="switch-label"><input type="checkbox" ' + (s.enabled?'checked':'') + ' onchange="toggleLib(this,' + idx + ')"> 启用</label></div>' +
+      '</div>' +
+    '</div>';
+  });
+  wrap.innerHTML = html;
+}
+function toggleCard(head) { head.closest('.ml-card').classList.toggle('collapsed'); }
+function addMagnetLib() {
+  ML_SOURCES.push({id:'', name:'', api_url_template:'', headers:[], stats_enabled:0, stats_api_url:'', stats_source:'', enabled:1});
+  renderMagnetLibs();
+}
+function removeMagnetLib(idx) {
+  if (!confirm('确认删除该磁链库？')) return;
+  ML_SOURCES.splice(idx, 1); renderMagnetLibs();
+}
+function moveLib(idx, dir) {
+  var to = idx + dir;
+  if (to < 0 || to >= ML_SOURCES.length) return;
+  var t = ML_SOURCES[idx]; ML_SOURCES[idx] = ML_SOURCES[to]; ML_SOURCES[to] = t;
+  renderMagnetLibs();
+}
+function addHeaderRow(idx) {
+  ML_SOURCES[idx].headers = ML_SOURCES[idx].headers || [];
+  ML_SOURCES[idx].headers.push({name:'', value:''});
+  renderMagnetLibs();
+}
+function removeHeaderRow(idx, hi) {
+  ML_SOURCES[idx].headers.splice(hi, 1); renderMagnetLibs();
+}
+function toggleStats(cb, idx) { ML_SOURCES[idx].stats_enabled = cb.checked ? 1 : 0; renderMagnetLibs(); }
+function toggleLib(cb, idx) { ML_SOURCES[idx].enabled = cb.checked ? 1 : 0; renderMagnetLibs(); }
+function collectMagnetLibs() {
+  return ML_SOURCES.map(function (s, i) {
+    return {id:(s.id||'').trim(), name:(s.name||'').trim(), api_url_template:(s.api_url_template||'').trim(),
+            headers:(s.headers||[]).map(function(h){ return {name:(h.name||'').trim(), value:(h.value||'').trim()}; }),
+            stats_enabled:s.stats_enabled?1:0, stats_api_url:(s.stats_api_url||'').trim(),
+            stats_source:(s.stats_source||'').trim(), enabled:s.enabled?1:0, sort_order:i+1};
+  });
+}
+async function saveMagnetLibs() {
+  var timeout = parseInt(v('ml-timeout')||'30') || 30;
+  try {
+    var j = await jsonPost('/api/magnet-sources/config', {timeout: timeout, sources: collectMagnetLibs()});
+    toast(j.ok ? '已保存' : ('保存失败：' + (j.error||'')));
+    if (j.ok) setTimeout(function(){ location.reload(); }, 500);
+  } catch (e) { toast('保存失败：' + e); }
+}
+function reloadMagnetLibs() { location.reload(); }
+async function testMagnetLib(idx) {
+  toast('正在测试连接…');
+  try {
+    var j = await jsonPost('/api/magnet-sources/test', {source: collectMagnetLibs()[idx]});
+    toast(j.ok ? (j.msg || '连接成功') : ('连接失败：' + (j.error || j.msg || '')));
+  } catch (e) { toast('测试失败：' + e); }
+}
+async function loadMagnetStats() {
+  var el = document.getElementById('ml-stats'), totalEl = document.getElementById('ml-total');
+  if (!el) return;
+  try {
+    var j = await (await fetch('/api/magnet-sources/stats')).json();
+    if (totalEl && j.ok) totalEl.textContent = '共 ' + (j.total || 0) + ' 条';
+    var libs = (j && j.libraries) || [];
+    if (!j.ok || !libs.length) { el.innerHTML = '<span class="ml-hint">暂无统计（启用统计 API 并配置统计地址后在此显示）。</span>'; return; }
+    var html = '';
+    libs.forEach(function (lib) {
+      html += '<div class="ml-stats-block"><div class="ml-stats-block-head">' + mlEsc(lib.name) +
+        ' <span class="ml-stats-date">' + (lib.date ? ('基于 ' + mlEsc(lib.date)) : '') + '</span></div>' +
+        '<div class="ml-stats-chips">' + (lib.categories||[]).map(function(c){ return '<span class="ml-chip">' + mlEsc(c.label) + '<b>' + Number(c.count).toLocaleString() + '</b></span>'; }).join('') + '</div></div>';
+    });
+    el.innerHTML = html;
+  } catch (e) { el.textContent = '加载统计失败'; }
+}
+// —— 磁链库历史纪录模态（2.png） ——
+function _mstrDeltaHtml(d) {
+  d = Number(d) || 0;
+  if (d > 0) return '<span class="mstr-delta pos">↑+' + Number(d).toLocaleString() + '</span>';
+  if (d < 0) return '<span class="mstr-delta neg">↓' + Number(d).toLocaleString() + '</span>';
+  return '';
+}
+function _mstrFmtTs(ts) {
+  // "2026-09-03T16:00:00" -> "09/03 16:00"
+  if (!ts) return '';
+  var p = String(ts).split('.')[0].replace('T', ' ').split(' ');
+  var d = (p[0] || '').split('-'), t = (p[1] || '').split(':');
+  return (d[1] || '') + '/' + (d[2] || '') + ' ' + (t[0] || '') + ':' + (t[1] || '');
+}
+function renderMagnetHistory(history) {
+  var el = document.getElementById('magnet-history-body');
+  if (!el) return;
+  if (!history || !history.length) { el.innerHTML = '<div class="ml-hint">暂无历史纪录（开启统计后，数据有变化时自动记录，最多保留最近 10 次）。</div>'; return; }
+  var html = '';
+  history.forEach(function (h) {
+    html += '<div class="mstr-item">' +
+      '<div class="mstr-time">{{ icon('clock', 14) }} ' + _mstrFmtTs(h.ts) + '</div>' +
+      '<div class="mstr-total">总量 <b>' + Number(h.total).toLocaleString() + '</b>' + _mstrDeltaHtml(h.delta) + '</div>' +
+      '<div class="mstr-groups">' +
+      (h.groups || []).map(function (g) {
+        return '<div class="mstr-group"><div class="mstr-site">' + mlEsc(g.site) +
+          ' <span class="mstr-subtotal">' + Number(g.subtotal).toLocaleString() + _mstrDeltaHtml(g.delta) + '</span></div>' +
+          '<div class="mstr-chips">' + (g.items || []).map(function (it) {
+            return '<span class="mstr-chip">' + mlEsc(it.label) + '<b>' + Number(it.count).toLocaleString() + '</b>' + _mstrDeltaHtml(it.delta) + '</span>';
+          }).join('') + '</div></div>';
+      }).join('') +
+      '</div></div>';
+  });
+  el.innerHTML = html;
+}
+async function openMagnetHistory() {
+  var modal = document.getElementById('magnet-history-modal');
+  if (modal) modal.hidden = false;
+  var el = document.getElementById('magnet-history-body');
+  if (el) el.innerHTML = '<div class="ml-hint">加载中…</div>';
+  try {
+    var j = await (await fetch('/api/magnet-stats/history')).json();
+    renderMagnetHistory((j && j.history) || []);
+  } catch (e) {
+    if (el) el.innerHTML = '<div class="ml-hint">加载失败：' + mlEsc(e) + '</div>';
+  }
+}
+function closeMagnetHistory() {
+  var modal = document.getElementById('magnet-history-modal');
+  if (modal) modal.hidden = true;
+}
+
+// 初始化
+renderMagnetLibs();
+loadMagnetStats();
+
 // —— JAVDB 登录 ——
 async function loginJavdb2() {
   var username = v('set-javdb-user').trim(), password = v('set-javdb-pass');
@@ -590,9 +908,26 @@ async function loginJavdb2() {
 }
 
 // —— 115 网盘 ——
+// Cookie 不按明文展示：输入框只显示头尾几位的掩码；未编辑时提交回真实 Cookie
+var P115_COOKIE = {{ pan115['cookie']|tojson }};
+function maskCookie(c) {
+  if (!c) return '';
+  // 字符全部显示（长度不变），只把中段用 * 代替，保留首尾
+  var keepStart = Math.floor(c.length * 0.3);
+  var keepEnd = Math.floor(c.length * 0.3);
+  var mid = c.slice(keepStart, c.length - keepEnd);
+  return c.slice(0, keepStart) + '*'.repeat(mid.length) + c.slice(-keepEnd);
+}
+function cookieVal() {
+  var box = document.getElementById('p115-cookie').value.trim();
+  return (box === maskCookie(P115_COOKIE)) ? P115_COOKIE : box;
+}
+document.addEventListener('DOMContentLoaded', function () {
+  document.getElementById('p115-cookie').value = maskCookie(P115_COOKIE);
+});
 var _pickStack = [{name:'根目录', cid:'0'}];
 async function testPan115() {
-  var cookie = document.getElementById('p115-cookie').value.trim();
+  var cookie = cookieVal();
   if (!cookie) { toast('请先填写 115 Cookie'); return; }
   toast('正在测试连接…');
   try { var j = await jsonPost('/api/pan115/test', {cookie: cookie}); toast(j.ok ? ('连接成功：' + j.msg) : ('连接失败：' + (j.msg || ''))); }
@@ -601,7 +936,7 @@ async function testPan115() {
 async function loadDirs() {
   var cur = _pickStack[_pickStack.length - 1];
   // 用输入框里当前的 cookie，即使用户还没点「保存配置」也能拉目录
-  var cookie = document.getElementById('p115-cookie').value.trim();
+  var cookie = cookieVal();
   try {
     var j = await jsonPost('/api/pan115/dirs', {cid: cur.cid, cookie: cookie});
     if (!j.ok) { toast('加载目录失败：' + (j.error || '')); return; }
@@ -626,7 +961,8 @@ function setAsTarget() {
 }
 async function savePan115() {
   var body = {
-    cookie: document.getElementById('p115-cookie').value.trim(),
+    cookie: cookieVal(),
+    app: document.getElementById('p115-app').value.trim() || 'web',
     timeout: parseInt(document.getElementById('p115-timeout').value || '30') || 30,
     quota: parseInt(document.getElementById('p115-quota').value || '0') || 0,
     target_cid: document.getElementById('p115-target-cid').textContent.trim(),
@@ -635,6 +971,66 @@ async function savePan115() {
   };
   try { var j = await jsonPost('/api/pan115/config', body); toast(j.ok ? '115 配置已保存' : ('保存失败：' + (j.error || ''))); if (j.ok) setTimeout(function(){ location.reload(); }, 600); }
   catch (e) { toast('保存失败：' + e); }
+}
+
+// —— 115 扫码登入 ——
+var _qrApp = 'web', _qrToken = null, _qrTimer = null;
+function _fitQrImg() {
+  // 按二维码原始像素 1:1 显示，只做封顶缩小、不再放大，避免模糊/锯齿
+  var qi = document.getElementById('p115-qr-img');
+  var w = qi.naturalWidth, h = qi.naturalHeight;
+  if (!w || !h) return;
+  var MAX = 240;
+  var s = Math.min(1, MAX / w);
+  qi.style.width = Math.round(w * s) + 'px';
+  qi.style.height = Math.round(h * s) + 'px';
+  qi.style.objectFit = 'contain';
+  qi.style.imageRendering = 'auto';
+}
+async function openQrLogin() {
+  _qrApp = document.getElementById('p115-app').value.trim() || 'web';
+  var modal = document.getElementById('p115-qr-modal');
+  var qi = document.getElementById('p115-qr-img');
+  modal.hidden = false;
+  document.getElementById('p115-qr-status').textContent = '正在获取二维码…';
+  qi.src = '';
+  qi.style.width = '240px';
+  qi.style.height = '240px';
+  document.getElementById('p115-qr-sub').textContent = '请用「' + _qrApp + '」客户端扫码';
+  try {
+    var j = await jsonPost('/api/pan115/qr/start', {app: _qrApp});
+    if (!j.ok) { toast('获取二维码失败：' + (j.error || '')); closeQrLogin(); return; }
+    _qrToken = j.token;
+    qi.onload = _fitQrImg;
+    qi.src = j.qr;
+    document.getElementById('p115-qr-status').textContent = '等待扫码…';
+    if (_qrTimer) clearInterval(_qrTimer);
+    _qrTimer = setInterval(pollQr, 2000);
+  } catch (e) { toast('获取二维码失败：' + e); closeQrLogin(); }
+}
+async function pollQr() {
+  try {
+    var j = await jsonPost('/api/pan115/qr/poll', {token: _qrToken});
+    if (!j.ok) return;
+    var st = document.getElementById('p115-qr-status');
+    st.textContent = j.msg || '';
+    if (j.status === 2) { clearInterval(_qrTimer); _qrTimer = null; finishQr(); }
+    else if (j.status === -1 || j.status === -2) { clearInterval(_qrTimer); _qrTimer = null; }
+  } catch (e) {}
+}
+async function finishQr() {
+  try {
+    var j = await jsonPost('/api/pan115/qr/result', {token: _qrToken, app: _qrApp});
+    if (!j.ok) { toast('扫码登入失败：' + (j.error || '') + '（可尝试换一个设备类型）'); return; }
+    P115_COOKIE = j.cookie;
+    document.getElementById('p115-cookie').value = maskCookie(j.cookie);
+    toast('扫码成功，Cookie 已填入，请点击「保存配置」');
+    closeQrLogin();
+  } catch (e) { toast('扫码登入失败：' + e); }
+}
+function closeQrLogin() {
+  if (_qrTimer) { clearInterval(_qrTimer); _qrTimer = null; }
+  document.getElementById('p115-qr-modal').hidden = true;
 }
 
 // —— 下载器优先级 ——

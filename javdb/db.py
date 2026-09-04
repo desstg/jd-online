@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import secrets
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -122,6 +123,7 @@ CREATE INDEX IF NOT EXISTS idx_push_status ON push_queue(status);
 CREATE TABLE IF NOT EXISTS pan115_config (
     id          INTEGER PRIMARY KEY CHECK (id = 1),
     cookie      TEXT,
+    app         TEXT DEFAULT 'web',
     timeout     INTEGER DEFAULT 30,
     quota       INTEGER DEFAULT 0,
     target_cid  TEXT DEFAULT '',
@@ -141,6 +143,30 @@ CREATE TABLE IF NOT EXISTS clouddrive2_config (
     save_path   TEXT DEFAULT '',
     enabled     INTEGER DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS magnet_sources (
+    id               TEXT PRIMARY KEY,                -- 库 ID (slug)；留空自动生成
+    name             TEXT NOT NULL DEFAULT '',
+    api_url_template TEXT NOT NULL DEFAULT '',        -- 含 {code}/{key} 占位符
+    headers          TEXT DEFAULT '[]',               -- JSON [{name,value}]
+    stats_enabled    INTEGER DEFAULT 0,
+    stats_api_url    TEXT DEFAULT '',
+    stats_source     TEXT DEFAULT '',                 -- 引用另一个库的 id
+    enabled          INTEGER DEFAULT 1,
+    sort_order       INTEGER DEFAULT 0,
+    created_at       TEXT,
+    updated_at       TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_magnet_sources_order ON magnet_sources(sort_order);
+
+CREATE TABLE IF NOT EXISTS magnet_stats_history (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts          TEXT NOT NULL,               -- 快照时间
+    total       INTEGER DEFAULT 0,           -- 聚合总量
+    fingerprint TEXT DEFAULT '',             -- 变化指纹（用于判断是否有变化）
+    payload     TEXT NOT NULL                -- JSON：{total, groups:[{site,subtotal,items:[{label,count}]}], date}
+);
+CREATE INDEX IF NOT EXISTS idx_mstr_ts ON magnet_stats_history(ts DESC);
 
 CREATE TABLE IF NOT EXISTS downloader (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -326,7 +352,8 @@ class Database:
                      "ALTER TABLE subscription_push_attempts ADD COLUMN info_hash TEXT",
                      "ALTER TABLE subscription_candidates ADD COLUMN attempted INTEGER DEFAULT 0",
                      "ALTER TABLE subscription_candidates ADD COLUMN push_ok INTEGER DEFAULT 0",
-                     "ALTER TABLE subscriptions ADD COLUMN matched_count INTEGER DEFAULT 0"):
+                     "ALTER TABLE subscriptions ADD COLUMN matched_count INTEGER DEFAULT 0",
+                     "ALTER TABLE pan115_config ADD COLUMN app TEXT DEFAULT 'web'"):
             try:
                 self.conn.execute(stmt)
             except sqlite3.OperationalError:
@@ -529,7 +556,7 @@ class Database:
             ON CONFLICT(btih) DO UPDATE SET
                 name=excluded.name, size=excluded.size, date=excluded.date,
                 magnet=excluded.magnet, has_hd=excluded.has_hd, has_sub=excluded.has_sub,
-                code=excluded.code,
+                code=excluded.code, source=excluded.source,
                 movie_id=COALESCE(excluded.movie_id, magnets.movie_id)
             """,
             m,
@@ -641,20 +668,24 @@ class Database:
     # ---- pan115 配置 / 下载器优先级 ----
     def get_pan115_config(self) -> dict:
         row = self.conn.execute("SELECT * FROM pan115_config WHERE id=1").fetchone()
-        return dict(row) if row else {
-            "cookie": "", "timeout": 30, "quota": 0,
+        if row:
+            cfg = dict(row)
+            cfg.setdefault("app", "web")  # 旧库 ALTER 后 app 可能为 NULL
+            return cfg
+        return {
+            "cookie": "", "app": "web", "timeout": 30, "quota": 0,
             "target_cid": "", "target_name": "", "enabled": 0,
         }
 
     def save_pan115_config(self, cfg: dict) -> None:
         self.conn.execute(
             """
-            INSERT INTO pan115_config (id, cookie, timeout, quota, target_cid, target_name, enabled)
-            VALUES (1, :cookie, :timeout, :quota, :target_cid, :target_name, :enabled)
+            INSERT INTO pan115_config (id, cookie, app, timeout, quota, target_cid, target_name, enabled)
+            VALUES (1, :cookie, :app, :timeout, :quota, :target_cid, :target_name, :enabled)
             ON CONFLICT(id) DO UPDATE SET
-                cookie=excluded.cookie, timeout=excluded.timeout, quota=excluded.quota,
-                target_cid=excluded.target_cid, target_name=excluded.target_name,
-                enabled=excluded.enabled
+                cookie=excluded.cookie, app=excluded.app, timeout=excluded.timeout,
+                quota=excluded.quota, target_cid=excluded.target_cid,
+                target_name=excluded.target_name, enabled=excluded.enabled
             """,
             cfg,
         )
@@ -684,6 +715,131 @@ class Database:
                 save_path=excluded.save_path, enabled=excluded.enabled
             """,
             cfg,
+        )
+        self.conn.commit()
+
+    # ---- 自定义磁链库 ----
+    def _parse_headers(self, raw) -> list:
+        if isinstance(raw, list):
+            return raw
+        try:
+            data = json.loads(raw or "[]")
+            return data if isinstance(data, list) else []
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    def list_magnet_sources(self) -> list[dict]:
+        rows = self.conn.execute(
+            "SELECT * FROM magnet_sources ORDER BY enabled DESC, sort_order ASC, id"
+        ).fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            d["headers"] = self._parse_headers(d.get("headers"))
+            out.append(d)
+        return out
+
+    def get_magnet_source(self, source_id: str) -> dict | None:
+        row = self.conn.execute("SELECT * FROM magnet_sources WHERE id=?", (source_id,)).fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        d["headers"] = self._parse_headers(d.get("headers"))
+        return d
+
+    def save_magnet_source(self, source: dict) -> str:
+        sid = (source.get("id") or "").strip()
+        if not sid:
+            sid = secrets.token_hex(4)
+        headers = json.dumps(source.get("headers") or [], ensure_ascii=False)
+        now = _now()
+        enabled = 1 if source.get("enabled") is None else int(source.get("enabled") or 0)
+        sort_order = int(source.get("sort_order") or 0)
+        if not sort_order:
+            mx = self.conn.execute(
+                "SELECT COALESCE(MAX(sort_order),0) FROM magnet_sources"
+            ).fetchone()[0]
+            sort_order = int(mx) + 1
+        self.conn.execute(
+            """
+            INSERT INTO magnet_sources (
+                id, name, api_url_template, headers, stats_enabled, stats_api_url,
+                stats_source, enabled, sort_order, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                name=excluded.name, api_url_template=excluded.api_url_template,
+                headers=excluded.headers, stats_enabled=excluded.stats_enabled,
+                stats_api_url=excluded.stats_api_url, stats_source=excluded.stats_source,
+                enabled=excluded.enabled, sort_order=excluded.sort_order, updated_at=excluded.updated_at
+            """,
+            (sid, source.get("name") or "", source.get("api_url_template") or "", headers,
+             int(source.get("stats_enabled") or 0), source.get("stats_api_url") or "",
+             source.get("stats_source") or "", enabled, sort_order, now, now),
+        )
+        self.conn.commit()
+        return sid
+
+    def delete_magnet_source(self, source_id: str) -> bool:
+        cur = self.conn.execute("DELETE FROM magnet_sources WHERE id=?", (source_id,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def renumber_magnet_sources(self) -> None:
+        rows = self.conn.execute(
+            "SELECT id FROM magnet_sources ORDER BY enabled DESC, sort_order ASC, id"
+        ).fetchall()
+        for i, r in enumerate(rows, start=1):
+            self.conn.execute("UPDATE magnet_sources SET sort_order=? WHERE id=?", (i, r["id"]))
+        self.conn.commit()
+
+    def replace_magnet_sources(self, sources: list[dict]) -> None:
+        """整批替换：清空后按顺序插入并重排（供底部「保存配置」按钮）。"""
+        self.conn.execute("DELETE FROM magnet_sources")
+        self.conn.commit()
+        for s in sources:
+            self.save_magnet_source(s)
+        self.renumber_magnet_sources()
+
+    # ---- 磁链库统计历史（2.png：有变化才记录，只保留最近 10 次） ----
+    def add_magnet_stats(self, ts: str, total: int, fingerprint: str, payload: dict) -> None:
+        self.conn.execute(
+            "INSERT INTO magnet_stats_history (ts, total, fingerprint, payload) VALUES (?, ?, ?, ?)",
+            (ts, int(total), fingerprint, json.dumps(payload, ensure_ascii=False)),
+        )
+        self.conn.commit()
+
+    def list_magnet_stats(self, limit: int = 10) -> list[dict]:
+        rows = self.conn.execute(
+            "SELECT * FROM magnet_stats_history ORDER BY ts DESC LIMIT ?", (limit,)
+        ).fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["payload"] = json.loads(d.get("payload") or "{}")
+            except json.JSONDecodeError:
+                d["payload"] = {}
+            out.append(d)
+        return out
+
+    def latest_magnet_stats(self) -> dict | None:
+        row = self.conn.execute(
+            "SELECT * FROM magnet_stats_history ORDER BY ts DESC LIMIT 1"
+        ).fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        try:
+            d["payload"] = json.loads(d.get("payload") or "{}")
+        except json.JSONDecodeError:
+            d["payload"] = {}
+        return d
+
+    def trim_magnet_stats(self, keep: int = 10) -> None:
+        self.conn.execute(
+            "DELETE FROM magnet_stats_history WHERE id NOT IN "
+            "(SELECT id FROM magnet_stats_history ORDER BY ts DESC LIMIT ?)",
+            (keep,),
         )
         self.conn.commit()
 

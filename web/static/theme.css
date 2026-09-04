@@ -218,6 +218,9 @@ body.images-blurred #blur-toggle .icon-eye-off { display: inline-flex; }
 body.images-blurred #blur-toggle { background: rgba(0,191,165,0.12); color: var(--accent); }
 body.images-blurred img { filter: blur(15px); }
 body.images-blurred img:hover { filter: none; transition: filter 0.15s; }
+/* 扫码二维码不参与「模糊图片」隐私效果，保持清晰可扫 */
+body.images-blurred img#p115-qr-img { filter: none; }
+body.images-blurred img#p115-qr-img:hover { filter: none; }
 
 /* ---------- 主内容 ---------- */
 .app-shell { min-height: 100vh; display: flex; flex-direction: column; }
@@ -297,6 +300,7 @@ a.page-btn:hover { color: var(--accent); border-color: var(--accent); }
 }
 .page-number:hover { border-color: var(--accent); color: var(--accent); }
 .page-number.active { border-color: var(--accent); background: var(--accent); color: #fff; font-weight: 600; }
+.page-gap { color: var(--text-muted); font-size: 0.82rem; padding: 0 0.1rem; }
 .page-jump { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--text-muted); font-size: 0.82rem; }
 .page-jump input {
   width: 54px; height: 32px; padding: 0 0.35rem; text-align: center;
@@ -310,9 +314,19 @@ a.page-btn:hover { color: var(--accent); border-color: var(--accent); }
 }
 .page-jump button:hover { border-color: var(--accent); color: var(--accent); }
 @media (max-width: 768px) {
-  .rank-pagination { gap: 0.55rem; }
-  .page-info { width: 100%; text-align: center; order: -1; }
-  .page-jump { width: 100%; justify-content: center; }
+  .pagination { gap: 0.5rem; padding-top: 0.6rem; }
+  .rank-pagination { gap: 0.5rem; margin-top: 1rem; }
+  .page-btn { padding: 0.3rem 0.55rem; font-size: 0.78rem; }
+  .page-info { order: -1; width: 100%; text-align: center; font-size: 0.78rem; }
+  /* 页码条占满剩余宽度、可横向滑动，避免窄屏溢出换行 */
+  .page-numbers { flex: 1 1 auto; min-width: 0; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; scrollbar-width: none; }
+  .page-numbers::-webkit-scrollbar { display: none; }
+  .page-number { width: 28px; height: 28px; min-width: 28px; font-size: 0.74rem; }
+  .page-gap { font-size: 0.74rem; }
+  .page-jump { order: 3; width: 100%; justify-content: center; gap: 0.3rem; }
+  .page-jump label { font-size: 0.78rem; }
+  .page-jump input { width: 46px; height: 28px; font-size: 0.78rem; }
+  .page-jump button { height: 28px; padding: 0 0.5rem; font-size: 0.78rem; }
 }
 
 /* ---------- 统计卡片 ---------- */
@@ -409,7 +423,7 @@ a.page-btn:hover { color: var(--accent); border-color: var(--accent); }
 .tag-chip {
   display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.4rem 0.8rem;
   background: var(--bg); border: 1px solid var(--border); border-radius: 999px;
-  color: var(--text-main); cursor: pointer; font-size: 0.85rem;
+  color: var(--text-main); cursor: pointer; font-size: 0.85rem; text-decoration: none;
 }
 .tag-chip:hover { border-color: var(--accent); color: var(--accent); }
 
@@ -439,6 +453,7 @@ a.page-btn:hover { color: var(--accent); border-color: var(--accent); }
   padding: 0.55rem 0.8rem; border-radius: 8px; font-family: var(--font-body); font-size: 0.9rem; outline: none;
 }
 .glass-input:focus { border-color: var(--accent); }
+textarea.glass-input { width: 100%; min-height: 4.5rem; resize: vertical; line-height: 1.5; }
 .form-row { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 1rem; }
 .form-row label { font-size: 0.82rem; color: var(--text-secondary); font-weight: 500; }
 .form-hint { font-size: 0.75rem; color: var(--text-muted); }
@@ -546,6 +561,22 @@ a.page-btn:hover { color: var(--accent); border-color: var(--accent); }
 .tab-btn:hover { color: var(--text-main); }
 .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
 .tab-btn svg { width: 15px; height: 15px; }
+/* 桌面端：计数用中文括号包着，如「磁力链接（12）」 */
+.tab-count::before { content: '（'; }
+.tab-count::after { content: '）'; }
+
+/* 手机端：详情页 tab 只显示图标 + 数字（名称隐藏），图标放大；横向滚动，为后续加 tab 预留 */
+@media (max-width: 768px) {
+  .tab-header { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .tab-header::-webkit-scrollbar { display: none; }
+  .tab-btn { flex: 1 1 auto; flex-direction: column; gap: 0.15rem; justify-content: center; padding: 0.5rem 0.3rem; min-width: 2.6rem; }
+  .tab-btn svg { width: 22px; height: 22px; }
+  .tab-btn .tab-name { display: none; }
+  .tab-count::before { content: none; }
+  .tab-count::after { content: none; }
+  .tab-count { font-size: 0.72rem; font-weight: 600; line-height: 1; color: var(--text-secondary); }
+  .tab-btn.active .tab-count { color: var(--accent); }
+}
 
 /* 演员 chips */
 .actor-chip {
@@ -1163,6 +1194,11 @@ a.page-btn:hover { color: var(--accent); border-color: var(--accent); }
 
 .actor-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .tag-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+/* 影库「按标签筛选」横幅 */
+.tag-filter-bar { display: inline-flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem; padding: 0.5rem 0.9rem; background: var(--bg); border: 1px solid var(--border); border-radius: 999px; font-size: 0.88rem; color: var(--text-main); }
+.tag-filter-label { display: inline-flex; align-items: center; gap: 0.3rem; }
+.tag-filter-clear { display: inline-flex; align-items: center; gap: 0.2rem; color: var(--text-secondary); font-size: 0.8rem; text-decoration: none; }
+.tag-filter-clear:hover { color: var(--accent); }
 .count-badge { background: var(--accent); color: #fff; font-size: 0.8rem; font-weight: 600; padding: 0.1rem 0.55rem; border-radius: 999px; }
 .summary-text { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6; }
 .empty-hint { color: var(--text-muted); font-size: 0.86rem; padding: 0.4rem 0; }
@@ -1251,6 +1287,17 @@ a.page-btn:hover { color: var(--accent); border-color: var(--accent); }
   background-repeat:no-repeat; background-position:right 0.7rem center; background-size:14px;
 }
 .filter-sel:hover, .filter-sel:focus { border-color:var(--accent); }
+/* 搜索页排序 chips：点击切换排序，再次点击当前项切换倒序/顺序 */
+.search-sort { display:inline-flex; gap:0.4rem; align-items:center; flex-wrap:wrap; }
+.sort-chip {
+  display:inline-flex; align-items:center; gap:0.3rem;
+  padding:0.45rem 0.7rem; border:1px solid var(--border); border-radius:8px;
+  background:#fff; font-family:var(--font-body); font-size:0.85rem; color:var(--text-secondary);
+  cursor:pointer; transition:border-color 0.15s, color 0.15s;
+}
+.sort-chip:hover { border-color:var(--accent); color:var(--text-main); }
+.sort-chip.active { border-color:var(--accent); color:var(--accent); font-weight:600; }
+.sort-dir { font-size:0.75rem; opacity:0.75; }
 
 /* 115 网盘配置 + 下载器优先级 */
 .switch-label { display:inline-flex; align-items:center; gap:0.4rem; color:var(--text-secondary); font-size:0.85rem; cursor:pointer; }
@@ -1298,8 +1345,10 @@ a.page-btn:hover { color: var(--accent); border-color: var(--accent); }
 .side-item.side-sub { padding-left: 1.3rem; font-size: 0.84rem; }
 .side-subs { display: none; flex-direction: column; gap: 2px; }
 .side-group.open .side-subs { display: flex; }
-.group-chev { margin-left: auto; color: var(--text-muted); display: inline-flex; }
+.group-chev { margin-left: auto; color: var(--text-muted); display: inline-flex; transition: transform 0.15s; }
 .group-chev svg { width: 13px; height: 13px; }
+/* 收起时箭头指向右，展开时指向下 */
+.side-group:not(.open) .group-chev { transform: rotate(-90deg); }
 .settings-main { flex: 1; min-width: 0; }
 .settings-main .panel { display: none; }
 .settings-main .panel.active { display: block; }
