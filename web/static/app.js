@@ -246,7 +246,8 @@ function toast(msg) {
     var year = now.getFullYear();
     var today = now.toISOString().slice(0, 10);
     // 默认：预下载 + 高清；（日期仅非影片订阅默认今年1月1日~今天）
-    form.elements.pre_download.checked = true;
+    var dlPd = form.querySelector('input[name="dlmode"][value="predownload"]');
+    if (dlPd) dlPd.checked = true;
     var hd = form.querySelector('input[name="qualities"][value="hd"]');
     var uhd = form.querySelector('input[name="qualities"][value="uhd"]');
     if (hd) hd.checked = true;
@@ -282,8 +283,10 @@ function toast(msg) {
       form.elements.target_id.value = s.target_id || '';
       form.elements.target_name.value = s.target_name || '';
       form.elements.target_url.value = s.target_url || '';
-      form.elements.download_mode.value = s.download_mode;
-      form.elements.pre_download.checked = !!s.pre_download;
+      var dlOpt = (s.pre_download) ? 'predownload' : (s.download_mode === 'upgrade' ? 'upgrade' : 'strict');
+      [].forEach.call(form.querySelectorAll('input[name="dlmode"]'), function (rb) {
+        rb.checked = (rb.value === dlOpt);
+      });
       ['min_size_mb','max_size_mb','max_file_count','release_date_from','release_date_to'].forEach(function (key) {
         form.elements[key].value = s[key] == null ? '' : s[key];
       });
@@ -321,8 +324,8 @@ function toast(msg) {
       target_id: fd.get('target_id') || (targetType === 'online' ? '' : name),
       target_name: name,
       target_url: fd.get('target_url').trim(),
-      download_mode: fd.get('download_mode'),
-      pre_download: form.elements.pre_download.checked,
+      download_mode: (fd.get('dlmode') === 'upgrade' ? 'upgrade' : 'strict'),
+      pre_download: (fd.get('dlmode') === 'predownload'),
       qualities: qualityBoxes().filter(function (b) { return b.checked; }).map(function (b) { return b.value; }),
       min_size_mb: fd.get('min_size_mb'), max_size_mb: fd.get('max_size_mb'),
       max_file_count: fd.get('max_file_count'), release_date_from: fd.get('release_date_from'),
@@ -689,6 +692,61 @@ function toast(msg) {
       }
     } catch (error) { toast(error.message); }
   });
+
+  // —— 订阅卡片实时检查进度：检查中右上角刷新图标持续转、检计数递增，检查完停转 ——
+  var SUB_CHECK_TIMER = null;
+  var REFRESH_SVG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>';
+  function currentWantView() {
+    var activeTab = root.querySelector('[data-want-view].active') || tabs[0];
+    return (activeTab && activeTab.getAttribute('data-want-view')) || 'pending';
+  }
+  function pollCheckStatus() {
+    var view = currentWantView();
+    api('/api/want/subscriptions?view=' + encodeURIComponent(view) + '&page_size=100').then(function (data) {
+      var items = data.items || [];
+      var byId = {};
+      items.forEach(function (it) { byId[it.id] = it; });
+      var anyChecking = false;
+      root.querySelectorAll('[data-subscription-id]').forEach(function (card) {
+        var id = parseInt(card.getAttribute('data-subscription-id'), 10);
+        var item = byId[id];
+        if (!item) return;
+        if (item.checking) anyChecking = true;
+        var chip = card.querySelector('.want-status-chip');
+        var btn = card.querySelector('[data-sub-check]');
+        if (chip) {
+          chip.classList.remove('active','paused','completed','checking');
+          chip.classList.add(item.checking ? 'checking' : (item.status || 'active'));
+          chip.textContent = item.checking ? '匹配中' : ({'active':'订阅中','paused':'已暂停','completed':'已完成'}[item.status] || '订阅中');
+        }
+        if (btn) {
+          if (item.checking) {
+            if (!btn.dataset.origChecked) btn.dataset.origChecked = btn.innerHTML;
+            btn.classList.add('checking');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="btn-spinner"></span>';
+          } else {
+            btn.classList.remove('checking');
+            btn.disabled = false;
+            btn.innerHTML = btn.dataset.origChecked || REFRESH_SVG;
+            delete btn.dataset.origChecked;
+          }
+        }
+        card.querySelectorAll('[data-sub-count]').forEach(function (el) {
+          if (item.matched_count != null) el.textContent = item.matched_count;
+        });
+      });
+      if (anyChecking) {
+        clearInterval(SUB_CHECK_TIMER);
+        SUB_CHECK_TIMER = setInterval(pollCheckStatus, 2000);
+      } else {
+        clearInterval(SUB_CHECK_TIMER);
+        SUB_CHECK_TIMER = null;
+      }
+    }).catch(function () {});
+  }
+  // 页面加载时，若已有卡片在检查（创建后跳转过来）立即开始轮询
+  if (root.querySelector('[data-subscription-id]')) pollCheckStatus();
 })();
 
 // 通用订阅入口（影片/演员/清单）：显示已订阅状态；点击先弹订阅弹窗（未订阅=创建带默认值，已订阅=编辑）。

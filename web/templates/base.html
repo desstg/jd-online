@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}?v=27">
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}?v=31">
 </head>
 <body>
   <div class="app-shell">
@@ -33,9 +33,9 @@
                   <span class="jdb-type-icon">
                     {% if cur_st == 'actor' %}{{ icon('user', 16) }}
                     {% elif cur_st == 'series' %}{{ icon('folder', 16) }}
-                    {% elif cur_st == 'maker' %}{{ icon('server', 16) }}
-                    {% elif cur_st == 'director' %}{{ icon('film', 16) }}
-                    {% elif cur_st == 'label' %}{{ icon('star', 16) }}
+                    {% elif cur_st == 'maker' %}{{ icon('factory', 16) }}
+                    {% elif cur_st == 'director' %}{{ icon('clapper', 16) }}
+                    {% elif cur_st == 'label' %}{{ icon('bookmark', 16) }}
                     {% elif cur_st == 'all' %}{{ icon('list', 16) }}
                     {% else %}{{ icon('hash', 16) }}{% endif %}
                   </span>
@@ -46,9 +46,9 @@
                   <button type="button" class="jdb-search-item {{ 'active' if cur_st == 'number' }}" data-st="number">{{ icon('hash', 15) }}<span class="jdb-item-label">番号直达</span><span class="jdb-item-check">{{ icon('check', 14) }}</span></button>
                   <button type="button" class="jdb-search-item {{ 'active' if cur_st == 'actor' }}" data-st="actor">{{ icon('user', 15) }}<span class="jdb-item-label">演员搜索</span><span class="jdb-item-check">{{ icon('check', 14) }}</span></button>
                   <button type="button" class="jdb-search-item {{ 'active' if cur_st == 'series' }}" data-st="series">{{ icon('folder', 15) }}<span class="jdb-item-label">系列搜索</span><span class="jdb-item-check">{{ icon('check', 14) }}</span></button>
-                  <button type="button" class="jdb-search-item {{ 'active' if cur_st == 'maker' }}" data-st="maker">{{ icon('server', 15) }}<span class="jdb-item-label">片商搜索</span><span class="jdb-item-check">{{ icon('check', 14) }}</span></button>
-                  <button type="button" class="jdb-search-item {{ 'active' if cur_st == 'director' }}" data-st="director">{{ icon('film', 15) }}<span class="jdb-item-label">导演搜索</span><span class="jdb-item-check">{{ icon('check', 14) }}</span></button>
-                  <button type="button" class="jdb-search-item {{ 'active' if cur_st == 'label' }}" data-st="label">{{ icon('star', 15) }}<span class="jdb-item-label">清单搜索</span><span class="jdb-item-check">{{ icon('check', 14) }}</span></button>
+                  <button type="button" class="jdb-search-item {{ 'active' if cur_st == 'maker' }}" data-st="maker">{{ icon('factory', 15) }}<span class="jdb-item-label">片商搜索</span><span class="jdb-item-check">{{ icon('check', 14) }}</span></button>
+                  <button type="button" class="jdb-search-item {{ 'active' if cur_st == 'director' }}" data-st="director">{{ icon('clapper', 15) }}<span class="jdb-item-label">导演搜索</span><span class="jdb-item-check">{{ icon('check', 14) }}</span></button>
+                  <button type="button" class="jdb-search-item {{ 'active' if cur_st == 'label' }}" data-st="label">{{ icon('bookmark', 15) }}<span class="jdb-item-label">清单搜索</span><span class="jdb-item-check">{{ icon('check', 14) }}</span></button>
                 </div>
               </div>
               <input type="text" name="q" id="jdb-search-input" placeholder="{% if cur_st == 'actor' %}搜索演员{% elif cur_st == 'series' %}搜索系列{% elif cur_st == 'maker' %}搜索片商{% elif cur_st == 'director' %}搜索导演{% elif cur_st == 'label' %}搜索清单{% elif cur_st == 'all' %}搜索影片{% else %}搜索影片番号{% endif %}" value="{{ q|default('') }}" autocomplete="off">
@@ -115,10 +115,10 @@
           <div class="form-row want-url-row" hidden><label>在线地址</label><input name="target_url" class="glass-input" placeholder="https://..."></div>
 
           <fieldset class="want-fieldset"><legend>下载模式</legend><div class="want-choice-row">
-            <label class="want-choice"><input type="radio" name="download_mode" value="strict" checked><span>严格模式</span></label>
-            <label class="want-choice"><input type="radio" name="download_mode" value="upgrade"><span>洗版模式</span></label>
-            <label class="want-switch"><input type="checkbox" name="pre_download"><span>预下载</span></label>
-          </div><p class="form-help">严格模式要求所有条件满足；预下载会在未完全命中时先选当前相对高质量资源，之后可洗版。</p></fieldset>
+            <label class="want-choice"><input type="radio" name="dlmode" value="strict"><span>严格模式</span></label>
+            <label class="want-choice"><input type="radio" name="dlmode" value="upgrade"><span>洗版模式</span></label>
+            <label class="want-choice"><input type="radio" name="dlmode" value="predownload" checked><span>预下载</span></label>
+          </div><p class="form-help">严格模式要求所有条件满足；洗版模式只在下更优资源时重推；预下载会先选当前相对高质量资源，之后可洗版。</p></fieldset>
 
           <fieldset class="want-fieldset"><legend>质量</legend><div class="want-quality-row">
             <label class="want-choice"><input type="checkbox" value="none" data-quality-none checked><span>无</span></label>
@@ -301,11 +301,11 @@
       followBtn.textContent = following ? '取消关注' : '关注';
       followBtn.classList.toggle('following', following);
     }
-    // 影片链接行徽章：HD / 字幕 / 破解 / 已推送
+    // 影片链接行徽章：VHD超清 / HD / 字幕 / 破解（已推送只靠按钮呈现，避免和按钮重复「已推送」）
     function linkBadges(l) {
       var b = '';
-      if (l.pushed) b += '<span class="mg-badge done">已推送</span>';
-      if (l.has_hd) b += '<span class="mg-badge on">HD</span>';
+      if (l.is_vhd) b += '<span class="mg-badge on">VHD</span>';
+      else if (l.has_hd) b += '<span class="mg-badge on">HD</span>';
       if (l.has_cn) b += '<span class="mg-badge on">字幕</span>';
       if (l.has_uc) b += '<span class="mg-badge break">破解</span>';
       return b;
@@ -366,14 +366,10 @@
       });
     }
 
-    // 推送成功后把磁链行标记为「已推送」（禁用按钮 + 显示已推送徽章）
+    // 推送成功后把磁链行标记为「已推送」（只禁用按钮，不再额外加徽章）
     function markRowPushed(btn) {
       var row = btn.closest('.si-row');
       if (!row) return;
-      var tags = row.querySelector('.si-tags');
-      if (tags && !tags.querySelector('.mg-badge.done')) {
-        tags.insertAdjacentHTML('afterbegin', '<span class="mg-badge done">已推送</span>');
-      }
       btn.classList.add('done');
       btn.textContent = '已推送';
       btn.disabled = true;

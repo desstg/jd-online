@@ -39,6 +39,27 @@ def extract_code(text: str | None) -> str | None:
     return None
 
 
+def item_quality(item: dict) -> tuple[int, int | None]:
+    """从 Emby/Jellyfin 条目解析 (resolution, size_bytes)。
+
+    resolution: 0=普通(SD,<720p) 1=高清(HD,720p~1080p) 2=超清(UHD,>=2160p)。
+    size_bytes: 取最大媒体源大小；未知返回 None。需同步时请求 Fields=MediaSources。
+    """
+    best_height = 0
+    size = None
+    for src in item.get("MediaSources") or []:
+        s = src.get("Size")
+        if s:
+            size = s if size is None else max(size, s)
+        for st in src.get("MediaStreams") or []:
+            if (st.get("Type") or "").lower() == "video" and st.get("Height"):
+                best_height = max(best_height, int(st["Height"]))
+        if src.get("Height"):
+            best_height = max(best_height, int(src["Height"]))
+    res = 2 if best_height >= 2160 else 1 if best_height >= 720 else 0
+    return res, size
+
+
 class MediaServerError(Exception):
     pass
 
@@ -96,6 +117,13 @@ class MediaServerClient:
             if len(batch) < limit or start >= total:
                 break
         return items
+
+    def fetch_item_media(self, item_id: str) -> dict:
+        """按条目 id 拉取含 MediaSources 的条目（质检回填用，从 MediaStreams 拿清晰度/大小）。"""
+        data = self._get(f"/Items/{item_id}", {"Fields": "MediaSources"})
+        if isinstance(data, dict) and "Item" in data:
+            data = data["Item"]
+        return data if isinstance(data, dict) else {}
 
     def search(self, code: str) -> dict | None:
         """按番号实时搜索，返回第一条命中或 None。"""

@@ -147,9 +147,9 @@ def detect_quality_tags(name: str, has_hd: int = 0, has_sub: int = 0) -> set[str
 
 
 def resource_score(tags: set[str], size_bytes: int | None) -> list[int]:
-    # 固定优先级：高清等级 -> 破解 -> 文件大小（越大越优先）。
+    # 优先级（用户定义）：破解优先 -> 清晰度（超清>高清>普通） -> 文件大小（越大越优）。
     resolution = 2 if "uhd" in tags else 1 if "hd" in tags else 0
-    return [resolution, 1 if "uncensored" in tags else 0, int(size_bytes or 0)]
+    return [1 if "uncensored" in tags else 0, resolution, int(size_bytes or 0)]
 
 
 def _info_hash_of(magnet_uri: str | None) -> str:
@@ -309,7 +309,7 @@ class CandidateMatcher:
         """磁链是否满足推送条件：质量 + 大小 + 文件数。"""
         reasons: list[str] = []
         qualities = set(subscription.get("qualities") or [])
-        if qualities and not qualities.intersection(tags):
+        if qualities and not qualities.issubset(tags):
             reasons.append("quality_not_matched")
         if subscription.get("min_size_mb") is not None:
             if size_bytes is None:
@@ -430,6 +430,9 @@ class SubscriptionCheckService:
                 list_id = subscription.get("target_id") if subscription["target_type"] == "list" else None
                 movie_ok, _ = self.matcher.movie_ok(subscription, movie, actor_ids=actor_ids, list_id=list_id)
                 (matched_movies if movie_ok else rejected_movies).add(movie["id"])
+                if movie_ok:
+                    # 增量写进度：每匹配一部即更新订阅+本轮跑，前端轮询可见实时增长
+                    self.db.update_subscription_progress(subscription_id, run_id, len(matched_movies))
                 for magnet in self.resolver.ensure_magnets(movie):
                     result = self.matcher.evaluate(subscription, movie, magnet,
                                                    actor_ids=actor_ids, list_id=list_id)
@@ -619,11 +622,7 @@ class SubscriptionPushService:
             return {"ok": ok, "attempt_id": existing["id"], "push_id": existing["push_id"],
                     "message": "已处理过" if ok else (existing["error_message"] or "上次推送失败")}
 
-        if subscription["download_mode"] == "upgrade":
-            previous = self.db.best_successful_score(subscription_id)
-            if previous is not None and tuple(candidate["resource_score"]) <= tuple(previous):
-                raise ValueError("该资源并不优于已完成资源")
-
+        # 洗版是否「优于」由 auto_push / subscribe_movie 依据库内质量预先过滤，这里不再按历史最佳拦截。
         attempt_id = self.db.create_push_attempt(subscription_id, candidate_id,
                                                   idempotency_key, "running")
         movie = self.db.get_movie(candidate.get("movie_id")) if candidate.get("movie_id") else None
@@ -645,6 +644,51 @@ class SubscriptionPushService:
             has_tracker = 1 if "&tr=" in (c.get("magnet_uri") or "") else 0
             return (tuple(c["resource_score"]), has_tracker, c["id"])
         return max(candidates, key=key) if candidates else None
+
+    def _matched_candidates_for_movie(self, subscription_id: int, movie_id: str) -> list[dict]:
+        """某影片的 matched 候选（解析 resource_score 为列表），供洗版按库内质量过滤。"""
+        rows = self.db.conn.execute(
+            "SELECT * FROM subscription_candidates WHERE subscription_id=? AND movie_id=? AND matched=1",
+            (subscription_id, movie_id),
+        ).fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["resource_score"] = json.loads(d.get("resource_score") or "[0,0,0]")
+            except (ValueError, TypeError):
+                d["resource_score"] = [0, 0, 0]
+            out.append(d)
+        return out
+
+    def _wash_eligible(self, candidates: list[dict], lib_map: dict) -> list[dict]:
+        """洗版候选过滤：只保留「超清(UHD)」，且相对媒体库质量可升级。
+
+        - 库内非超清：超清候选可升级。
+        - 库内已是超清：仅当候选文件大小 > 库内大小才升级。
+        - 未入库影片：超清候选直接可用。
+        resource_score = [破解, 清晰度(0普通 1高清 2超清), 大小(字节)]。
+        """
+        out = []
+        for c in candidates:
+            score = c.get("resource_score") or [0, 0, 0]
+            resolution = score[1] if len(score) > 1 else 0
+            if resolution < 2:
+                continue
+            csize = score[2] if len(score) > 2 else 0
+            code = ""
+            if c.get("movie_id"):
+                movie = self.db.get_movie(c.get("movie_id"))
+                if movie:
+                    code = movie["number"] or ""
+            lib = lib_map.get(code) if code else None
+            if lib is not None:
+                lib_res = lib[0] or 0
+                lib_size = lib[1] or 0
+                if lib_res >= 2 and csize <= lib_size:
+                    continue
+            out.append(c)
+        return out
 
     def _movie_in_library(self, candidate: dict, lib_codes: set[str]) -> bool:
         """候选影片番号是否已在媒体库。无 movie_id / 无番号时视为未入库。"""
@@ -685,32 +729,41 @@ class SubscriptionPushService:
         ).fetchone()
         if pending:
             return {"ok": True, "attempt_id": pending["id"], "message": "已有推送在等待网盘下载"}
-        # 洗版模式（upgrade）：已入库且符合条件的片才允许推送，故放行全部候选；
-        # 其余模式：已在媒体库的影片跳过不推送，并记入“跳过”选项卡（仅演员/清单订阅）。
+        # 洗版模式（upgrade）：只推「超清」候选，并相对媒体库质量——库内非超清时有超清就升级；
+        # 库内已是超清则仅当候选文件更大才推。其余模式：已在媒体库的影片跳过不推送。
         is_upgrade = subscription.get("download_mode") == "upgrade"
-        lib_codes = None if is_upgrade else self.db.library_codes()
         matched = self.db.untried_matched_candidates(subscription_id, False)
         if not matched:
+            if is_upgrade:
+                return {"ok": False, "message": "暂无可洗版的命中影片，等待新资源"}
             return {"ok": False, "message": "没有可用的命中磁链"}
-        if lib_codes is not None and subscription["target_type"] in ("actor", "list"):
-            lib_ids = self._library_movie_ids(matched, lib_codes)
-            for mid in lib_ids:
-                self.db.add_skip(subscription_id, mid)
-            avail = [c for c in matched if c.get("movie_id") not in lib_ids]
-        else:
-            lib_ids = set()
-            avail = matched
-        # 优先 push_ok 候选；预下载(force)时放宽为只要 matched 即可（推 predownload）
-        require_push_ok = not (subscription.get("pre_download") and force)
-        if require_push_ok:
-            candidate = self._pick_best([c for c in avail if c.get("push_ok")])
-        else:
+        if is_upgrade:
+            lib_map = self.db.library_quality_map()
+            avail = self._wash_eligible(matched, lib_map)
+            if not avail:
+                return {"ok": False, "message": "没有可升级的超清资源"}
             candidate = self._pick_best(avail)
-        if not candidate:
-            msg = "没有可用的命中磁链"
-            if not is_upgrade and lib_ids:
-                msg = f"命中影片均已入库，跳过 {len(lib_ids)} 部（洗版模式才可推送已入库影片）"
-            return {"ok": False, "message": msg}
+        else:
+            lib_codes = self.db.library_codes()
+            lib_ids = set()
+            if lib_codes and subscription["target_type"] in ("actor", "list"):
+                lib_ids = self._library_movie_ids(matched, lib_codes)
+                for mid in lib_ids:
+                    self.db.add_skip(subscription_id, mid)
+                avail = [c for c in matched if c.get("movie_id") not in lib_ids]
+            else:
+                avail = matched
+            # 优先 push_ok 候选；预下载(force)时放宽为只要 matched 即可（推 predownload）
+            require_push_ok = not (subscription.get("pre_download") and force)
+            if require_push_ok:
+                candidate = self._pick_best([c for c in avail if c.get("push_ok")])
+            else:
+                candidate = self._pick_best(avail)
+            if not candidate:
+                msg = "没有可用的命中磁链"
+                if lib_ids:
+                    msg = f"命中影片均已入库，跳过 {len(lib_ids)} 部（洗版模式才可推送已入库影片）"
+                return {"ok": False, "message": msg}
         key = f"auto:{subscription_id}:{candidate['resource_fingerprint']}"
         existing = self.db.conn.execute(
             "SELECT * FROM subscription_push_attempts WHERE idempotency_key=?", (key,)
@@ -744,26 +797,36 @@ class SubscriptionPushService:
         if not sub:
             return {"ok": False, "message": "订阅不存在"}
         # 非洗版模式：已在媒体库的影片跳过不推送，并记入“跳过”选项卡；洗版模式放行。
-        if sub.get("download_mode") != "upgrade":
+        is_upgrade = sub.get("download_mode") == "upgrade"
+        if is_upgrade:
+            # 洗版：只推「超清」候选，且相对库内质量可升级
+            candidates = self._matched_candidates_for_movie(subscription_id, movie_id)
+            elig = self._wash_eligible(candidates, self.db.library_quality_map())
+            candidate = self._pick_best(elig) if elig else None
+            if not candidate:
+                return {"ok": False, "message": "该影片无更优的超清资源"}
+        else:
             movie = self.db.get_movie(movie_id)
             if movie and (movie["number"] or "") in self.db.library_codes():
                 if sub["target_type"] in ("actor", "list"):
                     self.db.add_skip(subscription_id, movie_id)
                 return {"ok": False, "message": "影片已入库，跳过"}
-        row = self.db.conn.execute(
-            "SELECT id FROM subscription_candidates WHERE subscription_id=? AND movie_id=? AND matched=1 "
-            "ORDER BY push_ok DESC, resource_score DESC, id DESC LIMIT 1",
-            (subscription_id, movie_id),
-        ).fetchone()
-        if not row:
             row = self.db.conn.execute(
                 "SELECT id FROM subscription_candidates WHERE subscription_id=? AND movie_id=? AND matched=1 "
-                "ORDER BY resource_score DESC, id DESC LIMIT 1",
+                "ORDER BY push_ok DESC, json_extract(resource_score,'$[0]') DESC, "
+                "json_extract(resource_score,'$[1]') DESC, json_extract(resource_score,'$[2]') DESC, id DESC LIMIT 1",
                 (subscription_id, movie_id),
             ).fetchone()
-        if not row:
-            return {"ok": False, "message": "该影片无命中磁链"}
-        candidate = self.db.get_subscription_candidate(row["id"])
+            if not row:
+                row = self.db.conn.execute(
+                    "SELECT id FROM subscription_candidates WHERE subscription_id=? AND movie_id=? AND matched=1 "
+                    "ORDER BY json_extract(resource_score,'$[0]') DESC, "
+                    "json_extract(resource_score,'$[1]') DESC, json_extract(resource_score,'$[2]') DESC, id DESC LIMIT 1",
+                    (subscription_id, movie_id),
+                ).fetchone()
+            if not row:
+                return {"ok": False, "message": "该影片无命中磁链"}
+            candidate = self.db.get_subscription_candidate(row["id"])
         key = f"sub:{subscription_id}:{movie_id}:{candidate['resource_fingerprint']}"
         result = self.push_candidate(subscription_id, candidate["id"], key)
         # 115 提示“任务已存在”实际是已推送，视为成功

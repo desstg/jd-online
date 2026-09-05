@@ -33,6 +33,45 @@ CONFIG_PATH = "config.json"
 DEFAULT_JAVBUS = "https://www.javbus.com"
 
 
+_RE_VHD_NAME = re.compile(r"(?i)\b(?:4k|2160p|uhd|8k|4320p)\b|超清")
+_RE_SIZE_NUM = re.compile(r"([0-9]+(?:\.[0-9]+)?)\s*([tgkm]?b)?", re.I)
+
+
+def _size_gb(size) -> float | None:
+    """把 '2.02GB' / '6.5 GB' / '400MB' 这类大小字符串解析成 GB 数值；失败返回 None。"""
+    if size is None:
+        return None
+    try:
+        num = float(str(size).strip())
+        return num / 1024 if num > 1e4 else num  # 大概率是 MB => 亿级、按含 M 处理
+    except ValueError:
+        pass
+    m = _RE_SIZE_NUM.search(str(size))
+    if not m:
+        return None
+    val = float(m.group(1))
+    unit = (m.group(2) or "").lower()
+    if "t" in unit:
+        return val * 1024
+    if "g" in unit:
+        return val
+    if "m" in unit:
+        return val / 1024
+    if "k" in unit:
+        return val / 1024 / 1024
+    return val
+
+
+def _is_vhd(name: str, size) -> bool:
+    """VHD 超清：文件名含 4k/2160p/uhd 等标识，或文件大小 > 18GB。"""
+    if _RE_VHD_NAME.search(name or ""):
+        return True
+    gb = _size_gb(size)
+    if gb is not None and gb > 18:
+        return True
+    return False
+
+
 def _page_window(page: int, total: int, around: int = 2) -> list:
     """生成分页页码窗口，None 表示省略号。只显示首/末页 + 当前页前后 N 页。"""
     if total <= 1:
@@ -221,6 +260,31 @@ def start_subscription_scheduler() -> None:
     threading.Thread(target=loop, daemon=True).start()
 
 
+def start_library_quality_backfill() -> None:
+    """后台质检回填：空闲时慢慢为库内影片补充分辨率/大小，不阻塞主同步。
+
+    每次只回填一批（默认 20 部、条目间停顿 0.3s），约每 2 分钟跑一轮；全部补齐后每次耗时趋零。
+    """
+    import time as _t
+
+    def loop():
+        while True:
+            try:
+                db_path = cfgmod.load(CONFIG_PATH).get("db_path", "javdb.db")
+                db = Database(db_path)
+                try:
+                    n = sync.backfill_library_quality(db, limit=20, pause=0.3)
+                    if n:
+                        print(f"[质检回填] 更新 {n} 部清晰度", flush=True)
+                finally:
+                    db.close()
+            except Exception as e:  # noqa: BLE001
+                print(f"[质检回填] 异常: {e}", flush=True)
+            _t.sleep(120)
+
+    threading.Thread(target=loop, daemon=True).start()
+
+
 def _img_content_type(url: str) -> str:
     """按扩展名定 Content-Type。上游 CDN 有时返回 binary/octet-stream，
     导致浏览器不渲染，故不信任上游，直接按 URL 判断。"""
@@ -398,6 +462,7 @@ def _comment_magnets(db, movie_id: str) -> list[dict]:
             item["date"] = (r["created_at"] or "")[:10]
             item["sharer"] = r["username"] or ""
             item["sharer_id"] = r["user_id"] or ""
+            item["is_vhd"] = 1 if _is_vhd(item.get("name"), item.get("size")) else 0
             item["pushed"] = 1 if item["magnet"] in pushed_set else 0
             out.append(item)
     return out
@@ -596,7 +661,9 @@ def _run_subscription_full_push(db: Database, cfg: dict | None = None,
                                         or "已完成" in result["message"]
                                         or "没有完全命中" in result["message"]
                                         or "入库" in result["message"]
-                                        or "跳过" in result["message"]):
+                                        or "跳过" in result["message"]
+                                        or "洗版" in result["message"]
+                                        or "超清资源" in result["message"]):
             skipped += 1
         else:
             failed += 1
@@ -1044,6 +1111,7 @@ def create_app() -> Flask:
             for m in out:
                 m["has_uc"] = 1 if is_uncensored(m.get("name")) else 0
                 m["has_cn"] = 1 if is_chinese(m.get("name")) else 0
+                m["is_vhd"] = 1 if _is_vhd(m.get("name"), m.get("size")) else 0
                 m["pushed"] = 1 if m.get("magnet") in pushed_set else 0
             # 破解版排最前，其次字幕版，其余按日期（倒序）
             out.sort(key=lambda m: (m["has_uc"], m["has_cn"], m.get("date") or ""), reverse=True)
@@ -1094,6 +1162,28 @@ def create_app() -> Flask:
             related_lists=related_lists, relative_movies=relative_movies,
             lib_codes=_lib_codes(db), active="index")
 
+    @app.route("/reviews/<movie_id>/<int:rpage>")
+    def reviews_page(movie_id, rpage):
+        """单页评论的 HTML 片段：详情页评论区做局部刷新（不整页跳转）。"""
+        db = get_db()
+        movie = db.get_movie(movie_id)
+        if not movie:
+            return "", 404
+        per_page = 15
+        rpage = max(1, rpage)
+        total_reviews = db.conn.execute(
+            "SELECT COUNT(*) FROM reviews WHERE movie_id=?", (movie_id,)).fetchone()[0]
+        reviews = db.conn.execute(
+            "SELECT * FROM reviews WHERE movie_id=? ORDER BY likes_count DESC LIMIT ? OFFSET ?",
+            (movie_id, per_page, (rpage - 1) * per_page),
+        ).fetchall()
+        total_pages = max(1, (total_reviews + per_page - 1) // per_page)
+        rpage = min(rpage, total_pages)
+        return render_template(
+            "_reviews.html", reviews=reviews, movie=movie,
+            rpage=rpage, total_reviews=total_reviews, total_pages=total_pages,
+            page_items=_page_window(rpage, total_pages), fetching_reviews=False)
+
     @app.route("/api/user/<user_id>/shares")
     def user_shares(user_id):
         """某用户在本地库中分享过链接的所有影片（按影片聚合）。
@@ -1127,6 +1217,7 @@ def create_app() -> Flask:
             for item in links:
                 item = dict(item)
                 item["date"] = (r["created_at"] or "")[:10]
+                item["is_vhd"] = 1 if _is_vhd(item.get("name"), item.get("size")) else 0
                 item["pushed"] = 1 if item["magnet"] in pushed_set else 0
                 by_movie[mid]["links"].append(item)
         items = sorted(by_movie.values(), key=lambda m: m["number"] or "")
@@ -1177,6 +1268,8 @@ def create_app() -> Flask:
         cfg = get_cfg()
         tab = request.args.get("tab", "top250")
         per_page = 40
+        # 日/周/月榜每页 20（该分支分页器显示完整页码按键）；Top250 保持 40 且分页器保留窗口式
+        hot_per_page = 20
         page = max(1, request.args.get("page", 1, type=int))
         client = build_client(cfg)
         movies, actors, error = [], [], None
@@ -1191,10 +1284,10 @@ def create_app() -> Flask:
                     m["ranking"] = i + 1
                     all_movies.append(m)
                 count = len(all_movies)
-                total_pages = max(1, (count + per_page - 1) // per_page)
+                total_pages = max(1, (count + hot_per_page - 1) // hot_per_page)
                 page = min(page, total_pages)
-                start = (page - 1) * per_page
-                movies = all_movies[start:start + per_page]
+                start = (page - 1) * hot_per_page
+                movies = all_movies[start:start + hot_per_page]
             elif tab == "top250":
                 res = client.top250(type_="all", page=page, limit=per_page)
                 movies = (res.get("data") or {}).get("movies") or []
@@ -1226,9 +1319,11 @@ def create_app() -> Flask:
                 db.upsert_movie(scrape.normalize_movie(m))
         db.commit()
 
+        # 日/周/月榜：分页器显示全部页码按键（1..total_pages）；Top250 保留窗口式（省略号）分页
+        page_items = list(range(1, total_pages + 1)) if tab in ("daily", "weekly", "monthly") else _page_window(page, total_pages)
         return render_template("top250.html", movies=movies, actors=actors, error=error, page=page,
                                tab=tab, count=count, lib_codes=_lib_codes(db),
-                               page_items=_page_window(page, total_pages),
+                               page_items=page_items,
                                total_pages=total_pages, per_page=per_page, active="top250")
 
     @app.route("/search")
@@ -1260,13 +1355,16 @@ def create_app() -> Flask:
         if not q:
             return render_template("search.html", movies=[], q="", type_label=type_label,
                                    count=0, page=1, sort=sort, dir_=dir_, filter_=filter_, year=year,
-                                   total_pages=1, page_items=[1],
-                                   error=None, st=request.args.get("type", "number"), active="search")
+                                   total_pages=1, page_items=[1], error=None,
+                                   st=request.args.get("type", "number"), active="search",
+                                   actor_id=None, actor_name="")
 
         orig_type = request.args.get("type", "all")
         if stype not in ("actor", "series", "maker", "director", "label"):
             stype = "all"
         movies, error = [], None
+        actor_id = None
+        actor_name = q
         try:
             sort_by = {"release_date": "date", "score": "score"}.get(sort, "relevance")
             # 上映日期按方向控制 from_recent：desc 最新优先 / asc 最早优先；其余排序维持原样
@@ -1313,6 +1411,29 @@ def create_app() -> Flask:
             per = 24
             start = (page - 1) * per
             movies = filtered[start:start + per]
+
+            # 演员搜索：解析目标演员 id（第一部影片详情的 actors），供搜索页「订阅」按钮创建演员订阅
+            if stype == "actor" and filtered:
+                try:
+                    mid = filtered[0].get("id")
+                    if mid:
+                        detail = build_client(cfg).movie(mid)
+                        actors = ((detail.get("data") or {}).get("movie") or {}).get("actors") or []
+                        q_l = q.lower()
+                        match = next((a for a in actors
+                                      if (a.get("name") or "").strip().lower() == q_l), None)
+                        if match is None:
+                            match = next((a for a in actors
+                                          if (a.get("name_zht") or "").strip().lower() == q_l), None)
+                        if match is None:
+                            match = next((a for a in actors
+                                          if q_l in (a.get("name") or "").lower()), None)
+                        match = match or (actors[0] if actors else None)
+                        if match:
+                            actor_id = match.get("id")
+                            actor_name = match.get("name_zht") or match.get("name") or q
+                except Exception:  # noqa: BLE001
+                    actor_id = None
         except Exception as e:  # noqa: BLE001
             error = str(e)
 
@@ -1327,7 +1448,7 @@ def create_app() -> Flask:
                                total_pages=((len(filtered) + 23) // 24) if not error else 1,
                                page_items=_page_window(page, ((len(filtered) + 23) // 24) if not error else 1),
                                st=request.args.get("type", "number"), lib_codes=_lib_codes(db),
-                               active="search")
+                               actor_id=actor_id, actor_name=actor_name, active="search")
 
     @app.route("/library")
     def library_page():
@@ -2536,6 +2657,7 @@ def create_app() -> Flask:
     start_sync_scheduler()
     start_push_verify_worker()
     start_subscription_scheduler()
+    start_library_quality_backfill()
     return app
 
 

@@ -704,8 +704,6 @@ textarea.glass-input { width: 100%; min-height: 4.5rem; resize: vertical; line-h
 .sharer-card .si-link-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); }
 .sharer-card .si-link-size { color: var(--text-muted); flex-shrink: 0; min-width: 52px; text-align: right; }
 .sharer-card .si-tags { display: flex; gap: 0.3rem; flex-shrink: 0; }
-.sharer-card .si-tags .mg-badge.on { background: var(--accent); }
-.sharer-card .si-tags .mg-badge.break { background: #db2777; }
 .sharer-card .si-tags .mg-badge.done { background: rgba(0,191,165,0.12); color: var(--accent); border-color: transparent; }
 .sharer-card .si-push.done { background: rgba(0,191,165,0.10); color: var(--accent); border-color: transparent !important; cursor: default; opacity: 0.85; }
 .sharer-card .si-actions { display: flex; gap: 0.35rem; flex-shrink: 0; }
@@ -1102,6 +1100,7 @@ textarea.glass-input { width: 100%; min-height: 4.5rem; resize: vertical; line-h
 .want-status-chip.active { background:rgba(0,191,165,0.92); }
 .want-status-chip.paused { background:rgba(245,179,1,0.94); color:#5b4400; }
 .want-status-chip.completed { background:rgba(37,99,235,0.92); }
+.want-status-chip.checking { background:rgba(249,115,22,0.95); }
 
 .want-card-content { padding:0.6rem 0.7rem; display:flex; flex-direction:column; gap:0.35rem; }
 .want-card-foot { display:flex; align-items:center; justify-content:space-between; gap:0.5rem; margin-top:0.15rem; padding-top:0.5rem; border-top:1px solid var(--border); }
@@ -1215,7 +1214,7 @@ textarea.glass-input { width: 100%; min-height: 4.5rem; resize: vertical; line-h
 .mg-tags { display:flex; gap:0.4rem; flex-wrap:wrap; }
 .mg-badge { border:1px solid var(--border); color:var(--text-muted); padding:0.12rem 0.5rem; border-radius:6px; font-size:0.78rem; white-space:nowrap; }
 .mg-badge.on { border-color:var(--accent); color:var(--accent); background:rgba(0,191,165,0.06); }
-.mg-badge.break { background:#ff4d6d; border-color:#ff4d6d; color:#fff; font-weight:600; }
+.mg-badge.break { border-color:var(--accent); color:var(--accent); background:rgba(0,191,165,0.06); }
 .mg-badge.off { opacity:0.55; }
 .mg-actions { display:flex; gap:0.5rem; align-items:center; }
 .push-btn { background:#f59e0b; border:none; color:#fff; padding:0.28rem 0.7rem; border-radius:6px; font-size:0.78rem; cursor:pointer; display:inline-flex; align-items:center; gap:0.25rem; transition:background 0.15s; }

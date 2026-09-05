@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import time
+
 from .db import Database
-from .mediaserver import MediaServerClient, extract_code
+from .mediaserver import MediaServerClient, extract_code, item_quality
 
 
 def sync_library(db: Database, servers: list[dict], progress=None) -> tuple[int, list[tuple[str, str, int]]]:
@@ -44,6 +46,43 @@ def sync_library(db: Database, servers: list[dict], progress=None) -> tuple[int,
         total += n
         results.append((label, f"在线（{msg}）", n))
     return total, results
+
+
+def backfill_library_quality(db: Database, limit: int = 25, pause: float = 0.3) -> int:
+    """后台质检回填：为缺少清晰度的库内条目逐个拉取 MediaSources，慢慢补齐分辨率+大小。
+
+    每次处理 limit 条、条目间停顿 pause 秒，避免拖慢主同步/占满带宽。返回成功条数。
+    """
+    pending = db.library_items_without_quality(limit)
+    if not pending:
+        return 0
+    servers = {s["id"]: s for s in db.get_servers()}
+    by_server: dict[int, list[dict]] = {}
+    for row in pending:
+        by_server.setdefault(row["server_id"], []).append(row)
+    done = 0
+    for server_id, items in by_server.items():
+        srv = servers.get(server_id)
+        if not srv:
+            continue
+        client = MediaServerClient(
+            url=srv["url"], api_key=srv["api_key"],
+            name=srv.get("name", ""), type_=srv.get("type", "emby"),
+        )
+        for row in items:
+            try:
+                it = client.fetch_item_media(row["item_id"])
+                if it:
+                    res, size = item_quality(it)
+                    db.upsert_library_item(server_id, row["code"], it,
+                                           resolution=res, size_bytes=size)
+                    done += 1
+            except Exception:  # noqa: BLE001
+                pass
+            if pause:
+                time.sleep(pause)
+        db.commit()
+    return done
 
 
 def check_library(db: Database, code: str, servers: list[dict] | None = None,

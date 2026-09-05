@@ -65,9 +65,9 @@
           {% for item in items %}
           {% if item.kind == 'actor' %}
           <article class="want-card actor-card" data-subscription-id="{{ item.id }}" data-actor-subscription="{{ item.id }}" data-actor-name="{{ item.target_name | e }}">
-            <span class="want-status-chip {{ item.status }}" title="订阅状态">{{ {'active':'订阅中','paused':'已暂停','completed':'已完成'}[item.status] }}</span>
+            <span class="want-status-chip {{ 'checking' if item.checking else item.status }}" title="订阅状态">{{ '匹配中' if item.checking else {'active':'订阅中','paused':'已暂停','completed':'已完成'}[item.status] }}</span>
             <div class="want-card-actions">
-              <button class="want-action-btn" type="button" data-sub-check="{{ item.id }}" title="检查">{{ icon('refresh', 15) }}</button>
+              <button class="want-action-btn {{ 'checking' if item.checking }}" type="button" data-sub-check="{{ item.id }}" title="检查">{% if item.checking %}<span class="btn-spinner"></span>{% else %}{{ icon('refresh', 15) }}{% endif %}</button>
               <button class="want-action-btn" type="button" data-sub-edit="{{ item.id }}" title="编辑">{{ icon('edit', 15) }}</button>
               <button class="want-action-btn danger" type="button" data-sub-delete="{{ item.id }}" title="删除">{{ icon('trash', 15) }}</button>
               {% if item.status == 'paused' %}<button class="want-action-btn" type="button" data-sub-action="activate" data-id="{{ item.id }}" title="恢复">{{ icon('play', 15) }}</button>
@@ -77,14 +77,14 @@
               {% if item.actor_avatar %}<img src="{{ imgproxy(item.actor_avatar) }}" loading="lazy" alt="{{ item.title }}">{% else %}{{ icon('user', 30) }}{% endif %}
             </div>
             <div class="actor-name">{{ item.title }}</div>
-            <div class="actor-meta">{{ item.type_label }} · 检 {{ item.matched_count or 0 }} · 推 {{ item.push_count }}</div>
+            <div class="actor-meta">{{ item.type_label }} · 检 <span data-sub-count="{{ item.id }}">{{ item.matched_count or 0 }}</span> · 推 {{ item.push_count }}</div>
             <div class="actor-foot">{{ icon('clock', 12) }} {{ item.date_str }}</div>
           </article>
           {% elif item.kind == 'list' %}
           <article class="want-card list-card" data-subscription-id="{{ item.id }}" data-movies-subscription="{{ item.id }}" data-movies-name="{{ item.target_name | e }}">
-            <span class="want-status-chip {{ item.status }}" title="订阅状态">{{ {'active':'订阅中','paused':'已暂停','completed':'已完成'}[item.status] }}</span>
+            <span class="want-status-chip {{ 'checking' if item.checking else item.status }}" title="订阅状态">{{ '匹配中' if item.checking else {'active':'订阅中','paused':'已暂停','completed':'已完成'}[item.status] }}</span>
             <div class="want-card-actions">
-              <button class="want-action-btn" type="button" data-sub-check="{{ item.id }}" title="检查">{{ icon('refresh', 15) }}</button>
+              <button class="want-action-btn {{ 'checking' if item.checking }}" type="button" data-sub-check="{{ item.id }}" title="检查">{% if item.checking %}<span class="btn-spinner"></span>{% else %}{{ icon('refresh', 15) }}{% endif %}</button>
               <button class="want-action-btn" type="button" data-sub-edit="{{ item.id }}" title="编辑">{{ icon('edit', 15) }}</button>
               <button class="want-action-btn danger" type="button" data-sub-delete="{{ item.id }}" title="删除">{{ icon('trash', 15) }}</button>
               {% if item.status == 'paused' %}<button class="want-action-btn" type="button" data-sub-action="activate" data-id="{{ item.id }}" title="恢复">{{ icon('play', 15) }}</button>
@@ -92,7 +92,7 @@
             </div>
             <div class="list-logo">{{ item.list_logo or '清' }}</div>
             <div class="list-name">{{ item.title }}</div>
-            <div class="list-meta"><span class="list-count">{{ icon('folder', 12) }} {{ item.matched_count or 0 }}</span></div>
+            <div class="list-meta"><span class="list-count">{{ icon('folder', 12) }} <span data-sub-count="{{ item.id }}">{{ item.matched_count or 0 }}</span></span></div>
             <div class="list-foot">{{ icon('clock', 12) }} {{ item.date_str }}</div>
             <div class="list-tags">{% for q in item.qualities %}<span class="q-badge {{ q }}">{{ {'hd':'高清','uhd':'超清','subtitle':'字幕','uncensored':'破解'}[q] }}</span>{% endfor %}</div>
           </article>
@@ -100,9 +100,9 @@
           <article class="want-card video-card" data-subscription-id="{{ item.id }}" {% if item.movie_url %}data-movie-url="{{ item.movie_url }}"{% endif %}>
             <div class="want-card-cover card-cover">
               {% if item.cover %}<img src="{{ imgproxy(item.cover) }}" loading="lazy" alt="{{ item.number or item.title }}">{% else %}<div class="placeholder">无封面</div>{% endif %}
-              <span class="want-status-chip {{ item.status }}" title="订阅状态">{{ {'active':'订阅中','paused':'已暂停','completed':'已完成'}[item.status] }}</span>
+              <span class="want-status-chip {{ 'checking' if item.checking else item.status }}" title="订阅状态">{{ '匹配中' if item.checking else {'active':'订阅中','paused':'已暂停','completed':'已完成'}[item.status] }}</span>
               <div class="want-card-actions">
-                <button class="want-action-btn" type="button" data-sub-check="{{ item.id }}" title="检查">{{ icon('refresh', 15) }}</button>
+                <button class="want-action-btn {{ 'checking' if item.checking }}" type="button" data-sub-check="{{ item.id }}" title="检查">{% if item.checking %}<span class="btn-spinner"></span>{% else %}{{ icon('refresh', 15) }}{% endif %}</button>
                 <button class="want-action-btn" type="button" data-sub-edit="{{ item.id }}" title="编辑">{{ icon('edit', 15) }}</button>
                 <button class="want-action-btn danger" type="button" data-sub-delete="{{ item.id }}" title="删除">{{ icon('trash', 15) }}</button>
                 {% if item.status == 'paused' %}<button class="want-action-btn" type="button" data-sub-action="activate" data-id="{{ item.id }}" title="恢复">{{ icon('play', 15) }}</button>
@@ -116,7 +116,7 @@
               <div class="card-title">{{ item.title }}</div>
               <div class="want-card-foot">
                 <span class="want-foot-item {% if item.last_error %}error{% endif %}">{{ icon('clock', 12) }} {{ item.date_str }}</span>
-                <span class="want-foot-item" title="来源订阅">{{ item.source_name or ('检 ' ~ (item.matched_count or 0) ~ ' · 推 ' ~ item.push_count) }}</span>
+                <span class="want-foot-item" title="来源订阅">{% if item.source_name %}{{ item.source_name }}{% else %}检 <span data-sub-count="{{ item.id }}">{{ item.matched_count or 0 }}</span> · 推 {{ item.push_count }}{% endif %}</span>
               </div>
             </div>
           </article>

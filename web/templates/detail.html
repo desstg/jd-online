@@ -112,7 +112,7 @@
 
 {% if movie['summary'] %}
 <div class="detail-section detail-full">
-  <div class="dbs-card-title">{{ icon('film') }} 简介</div>
+  <div class="dbs-card-title">{{ icon('info') }} 简介</div>
   <div class="summary-text">{{ movie['summary'] }}</div>
 </div>
 {% endif %}
@@ -155,7 +155,7 @@
     <button type="button" class="tab-btn" data-tab="avdb" onclick="switchTab('avdb')">{{ icon('database', 15) }}<span class="tab-label"><span class="tab-name">AVDB磁链</span><span class="tab-count">{{ avdb_magnets|length }}</span></span></button>
     <button type="button" class="tab-btn" data-tab="ed2k" onclick="switchTab('ed2k')">{{ icon('share', 15) }}<span class="tab-label"><span class="tab-name">评论区分享</span><span class="tab-count">{{ comment_magnets|length }}</span></span></button>
     <button type="button" class="tab-btn" data-tab="related" onclick="switchTab('related')">{{ icon('folder', 15) }}<span class="tab-label"><span class="tab-name">关联清单</span><span class="tab-count">{{ related_lists|length if related_lists|length < 50 else '50+' }}</span></span></button>
-    <button type="button" class="tab-btn" data-tab="reviews" onclick="switchTab('reviews')">{{ icon('list', 15) }}<span class="tab-label"><span class="tab-name">评论</span><span class="tab-count">{{ total_reviews }}</span></span></button>
+    <button type="button" class="tab-btn" data-tab="reviews" onclick="switchTab('reviews')">{{ icon('message', 15) }}<span class="tab-label"><span class="tab-name">评论</span><span class="tab-count">{{ total_reviews }}</span></span></button>
   </div>
 
   <div class="tab-panel" id="tab-magnets">
@@ -170,7 +170,8 @@
       <div class="mg-name" title="{{ mg['name'] }}">{{ mg['name'] }}</div>
       <div class="mg-foot">
         <div class="mg-tags">
-          <span class="mg-badge {{ 'on' if mg['has_hd'] else 'off' }}">HD</span>
+          {% if mg.get('is_vhd') %}<span class="mg-badge on">VHD</span>
+          {% else %}<span class="mg-badge {{ 'on' if mg['has_hd'] else 'off' }}">HD</span>{% endif %}
           <span class="mg-badge {{ 'on' if mg['has_cn'] else 'off' }}">字幕</span>
           <span class="mg-badge {{ 'break' if mg['has_uc'] else 'off' }}">破解</span>
         </div>
@@ -203,7 +204,8 @@
       <div class="mg-name" title="{{ mg['name'] }}">{{ mg['name'] }}</div>
       <div class="mg-foot">
         <div class="mg-tags">
-          <span class="mg-badge {{ 'on' if mg['has_hd'] else 'off' }}">HD</span>
+          {% if mg.get('is_vhd') %}<span class="mg-badge on">VHD</span>
+          {% else %}<span class="mg-badge {{ 'on' if mg['has_hd'] else 'off' }}">HD</span>{% endif %}
           <span class="mg-badge {{ 'on' if mg['has_cn'] else 'off' }}">字幕</span>
           <span class="mg-badge {{ 'break' if mg['has_uc'] else 'off' }}">破解</span>
         </div>
@@ -243,7 +245,8 @@
       </div>
       <div class="mg-foot">
         <div class="mg-tags">
-          <span class="mg-badge {{ 'on' if mg['has_hd'] else 'off' }}">HD</span>
+          {% if mg.get('is_vhd') %}<span class="mg-badge on">VHD</span>
+          {% else %}<span class="mg-badge {{ 'on' if mg['has_hd'] else 'off' }}">HD</span>{% endif %}
           <span class="mg-badge {{ 'on' if mg['has_cn'] else 'off' }}">字幕</span>
           <span class="mg-badge {{ 'break' if mg['has_uc'] else 'off' }}">破解</span>
         </div>
@@ -275,44 +278,8 @@
     {% endif %}
   </div>
 
-  <div class="tab-panel" id="tab-reviews" style="display:none;">
-    {% if reviews %}
-    <div style="display:flex;flex-direction:column;gap:0.8rem;">
-      {% for r in reviews %}
-      <div style="padding:0.7rem 0;border-bottom:1px solid var(--border);">
-        <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.35rem;">
-          <span style="font-weight:600;font-size:0.88rem;">{{ r['username'] or '匿名' }}</span>
-          {% if r['score'] %}<span class="badge">★ {{ r['score'] }}</span>{% endif %}
-          {% if r['likes_count'] %}<span style="color:var(--text-muted);font-size:0.78rem;">{{ r['likes_count'] }} 赞</span>{% endif %}
-        </div>
-        <div style="color:var(--text-secondary);font-size:0.88rem;line-height:1.5;">{{ r['content'] }}</div>
-      </div>
-      {% endfor %}
-    </div>
-    {% if total_pages > 1 %}
-    <div class="pagination rank-pagination">
-      {% set base = '?rpage=' %}
-      {% if rpage > 1 %}<a class="page-btn" href="{{ base }}{{ rpage - 1 }}">← 上一页</a>{% else %}<span class="page-btn disabled">← 上一页</span>{% endif %}
-      <div class="page-numbers" aria-label="分页">
-        {% for p in page_items %}
-        {% if p is none %}<span class="page-gap">…</span>
-        {% else %}<a class="page-number {{ 'active' if p == rpage }}" href="{{ base }}{{ p }}">{{ p }}</a>{% endif %}
-        {% endfor %}
-      </div>
-      <span class="page-info">第 {{ rpage }} / {{ total_pages }} 页</span>
-      {% if rpage < total_pages %}<a class="page-btn" href="{{ base }}{{ rpage + 1 }}">下一页 →</a>{% else %}<span class="page-btn disabled">下一页 →</span>{% endif %}
-      <form class="page-jump" action="" method="get">
-        <label for="review-page-jump">跳转到</label>
-        <input id="review-page-jump" name="rpage" type="number" min="1" max="{{ total_pages }}" value="{{ rpage }}" aria-label="跳转页码">
-        <button type="submit">页</button>
-      </form>
-    </div>
-    {% endif %}
-    {% elif fetching_reviews %}
-    <div class="loading-hint"><span class="spinner"></span>正在加载评论...</div>
-    {% else %}
-    <div class="empty-card" style="padding:1.5rem;">暂无评论。</div>
-    {% endif %}
+  <div class="tab-panel" id="tab-reviews" style="display:none;" data-movie-id="{{ movie['id'] }}">
+    {% include "_reviews.html" %}
   </div>
 </div>
 
@@ -383,6 +350,58 @@ function scrollRel(dir) {
   var t = document.getElementById('rel-track');
   if (t) t.scrollBy({left: dir * 480, behavior: 'smooth'});
 }
+
+// —— 评论分页：局部刷新（不整页跳转）——
+var reviewLoading = false;
+function loadReviewPage(page) {
+  if (reviewLoading) return;
+  var panel = document.getElementById('tab-reviews');
+  if (!panel) return;
+  var movieId = panel.getAttribute('data-movie-id');
+  reviewLoading = true;
+  var pag = panel.querySelector('.pagination');
+  if (pag) pag.style.opacity = '0.5';
+  fetch('/reviews/' + movieId + '/' + page)
+    .then(function (r) { return r.text(); })
+    .then(function (html) {
+      panel.innerHTML = html;
+      // 更新地址栏（不触发刷新），便于分享/回退
+      if (history.replaceState) history.replaceState(null, '', '?rpage=' + page + '#tab-reviews');
+      // 保持评论 tab 激活并滚动到评论区
+      switchTab('reviews');
+      setTimeout(function () { panel.scrollIntoView({behavior: 'smooth', block: 'start'}); }, 30);
+    })
+    .catch(function () {
+      if (pag) pag.style.opacity = '';
+      toast('评论加载失败');
+    })
+    .then(function () { reviewLoading = false; });
+}
+// 事件委托：拦截评论区的分页点击 / 跳转表单
+document.addEventListener('click', function (e) {
+  var pageLink = e.target.closest && e.target.closest('#tab-reviews .page-number, #tab-reviews .page-btn');
+  if (pageLink && pageLink.dataset.page) {
+    e.preventDefault();
+    loadReviewPage(parseInt(pageLink.dataset.page, 10));
+  }
+});
+document.addEventListener('submit', function (e) {
+  if (e.target && e.target.closest && e.target.closest('#tab-reviews .page-jump')) {
+    e.preventDefault();
+    var form = e.target.closest('#tab-reviews .page-jump');
+    var input = form.querySelector('input[name="rpage"]');
+    var total = parseInt(form.getAttribute('data-total-pages'), 10) || 1;
+    var p = Math.min(Math.max(parseInt(input.value, 10) || 1, 1), total);
+    loadReviewPage(p);
+  }
+});
+// 直接带 ?rpage= 访问时（如从分享链接进入），切到评论 tab 并定位
+(function () {
+  if (!/rpage=/.test(location.search)) return;
+  switchTab('reviews');
+  var el = document.getElementById('tab-reviews');
+  if (el) setTimeout(function () { el.scrollIntoView({behavior: 'smooth', block: 'start'}); }, 60);
+})();
 
 // —— 预览图全屏查看器 ——
 var lightboxImages = [];

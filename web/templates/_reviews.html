@@ -1,0 +1,37 @@
+{% if reviews %}
+<div style="display:flex;flex-direction:column;gap:0.8rem;">
+  {% for r in reviews %}
+  <div style="padding:0.7rem 0;border-bottom:1px solid var(--border);">
+    <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.35rem;">
+      <span style="font-weight:600;font-size:0.88rem;">{{ r['username'] or '匿名' }}</span>
+      {% if r['score'] %}<span class="badge">★ {{ r['score'] }}</span>{% endif %}
+      {% if r['likes_count'] %}<span style="color:var(--text-muted);font-size:0.78rem;">{{ r['likes_count'] }} 赞</span>{% endif %}
+    </div>
+    <div style="color:var(--text-secondary);font-size:0.88rem;line-height:1.5;">{{ r['content'] }}</div>
+  </div>
+  {% endfor %}
+</div>
+{% if total_pages > 1 %}
+<div class="pagination rank-pagination" data-total-pages="{{ total_pages }}">
+  {% set base = '?rpage=' %}
+  {% if rpage > 1 %}<a class="page-btn" href="javascript:;" data-page="{{ rpage - 1 }}">← 上一页</a>{% else %}<span class="page-btn disabled">← 上一页</span>{% endif %}
+  <div class="page-numbers" aria-label="分页">
+    {% for p in page_items %}
+    {% if p is none %}<span class="page-gap">…</span>
+    {% else %}<a class="page-number {{ 'active' if p == rpage }}" href="javascript:;" data-page="{{ p }}">{{ p }}</a>{% endif %}
+    {% endfor %}
+  </div>
+  <span class="page-info">第 {{ rpage }} / {{ total_pages }} 页</span>
+  {% if rpage < total_pages %}<a class="page-btn" href="javascript:;" data-page="{{ rpage + 1 }}">下一页 →</a>{% else %}<span class="page-btn disabled">下一页 →</span>{% endif %}
+  <form class="page-jump" data-total-pages="{{ total_pages }}" onsubmit="return false;">
+    <label for="review-page-jump">跳转到</label>
+    <input id="review-page-jump" name="rpage" type="number" min="1" max="{{ total_pages }}" value="{{ rpage }}" aria-label="跳转页码">
+    <button type="button">页</button>
+  </form>
+</div>
+{% endif %}
+{% elif fetching_reviews %}
+<div class="loading-hint"><span class="spinner"></span>正在加载评论...</div>
+{% else %}
+<div class="empty-card" style="padding:1.5rem;">暂无评论。</div>
+{% endif %}

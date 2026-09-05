@@ -191,6 +191,8 @@ CREATE TABLE IF NOT EXISTS library_items (
     title     TEXT,
     path      TEXT,
     synced_at TEXT,
+    resolution INTEGER,
+    size_bytes INTEGER,
     PRIMARY KEY (server_id, item_id)
 );
 CREATE INDEX IF NOT EXISTS idx_library_code ON library_items(code);
@@ -353,7 +355,9 @@ class Database:
                      "ALTER TABLE subscription_candidates ADD COLUMN attempted INTEGER DEFAULT 0",
                      "ALTER TABLE subscription_candidates ADD COLUMN push_ok INTEGER DEFAULT 0",
                      "ALTER TABLE subscriptions ADD COLUMN matched_count INTEGER DEFAULT 0",
-                     "ALTER TABLE pan115_config ADD COLUMN app TEXT DEFAULT 'web'"):
+                     "ALTER TABLE pan115_config ADD COLUMN app TEXT DEFAULT 'web'",
+                     "ALTER TABLE library_items ADD COLUMN resolution INTEGER",
+                     "ALTER TABLE library_items ADD COLUMN size_bytes INTEGER"):
             try:
                 self.conn.execute(stmt)
             except sqlite3.OperationalError:
@@ -568,6 +572,22 @@ class Database:
     def library_codes(self) -> set[str]:
         """媒体库中已入库影片的番号集合。"""
         return {r["code"] for r in self.conn.execute("SELECT DISTINCT code FROM library_items")}
+
+    def library_quality_map(self) -> dict[str, tuple[int, int | None]]:
+        """返回 {番号: (resolution, size_bytes)}，供洗版对比库内质量。
+
+        resolution: 0=普通 1=高清 2=超清（由同步时的 MediaSources 解析，可能为默认 0）。
+        """
+        rows = self.conn.execute(
+            "SELECT code, resolution, size_bytes FROM library_items").fetchall()
+        return {r["code"]: (r["resolution"] or 0, r["size_bytes"]) for r in rows}
+
+    def library_items_without_quality(self, limit: int = 25) -> list[dict]:
+        """返回尚未采集清晰度的库内条目（后台质检回填用）。"""
+        rows = self.conn.execute(
+            "SELECT item_id, server_id, code FROM library_items WHERE resolution IS NULL "
+            "ORDER BY code LIMIT ?", (limit,)).fetchall()
+        return [dict(r) for r in rows]
 
     def mark_viewed(self, movie_id: str) -> None:
         self.conn.execute("UPDATE movies SET last_viewed_at=? WHERE id=?", (_now(), movie_id))
@@ -911,15 +931,19 @@ class Database:
     def clear_library(self, server_id: int) -> None:
         self.conn.execute("DELETE FROM library_items WHERE server_id=?", (server_id,))
 
-    def upsert_library_item(self, server_id: int, code: str, item: dict) -> None:
+    def upsert_library_item(self, server_id: int, code: str, item: dict,
+                            resolution: int | None = None, size_bytes: int | None = None) -> None:
         self.conn.execute(
             """
-            INSERT INTO library_items (item_id, server_id, code, title, path, synced_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO library_items (item_id, server_id, code, title, path, synced_at, resolution, size_bytes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(server_id, item_id) DO UPDATE SET
-                code=excluded.code, title=excluded.title, path=excluded.path, synced_at=excluded.synced_at
+                code=excluded.code, title=excluded.title, path=excluded.path, synced_at=excluded.synced_at,
+                resolution=COALESCE(excluded.resolution, library_items.resolution),
+                size_bytes=COALESCE(excluded.size_bytes, library_items.size_bytes)
             """,
-            (item.get("Id"), server_id, code, item.get("Name"), item.get("Path"), _now()),
+            (item.get("Id"), server_id, code, item.get("Name"), item.get("Path"), _now(),
+             resolution, size_bytes),
         )
 
     def lookup_library(self, code: str) -> list[sqlite3.Row]:
@@ -1050,6 +1074,9 @@ class Database:
         item["score_version"] = priority["score_version"] if priority else "v1"
         item["categories"] = json.loads(item.get("categories") or "[]")
         item["exclude_categories"] = json.loads(item.get("exclude_categories") or "[]")
+        item["checking"] = bool(self.conn.execute(
+            "SELECT 1 FROM subscription_check_runs WHERE subscription_id=? AND status='running' LIMIT 1",
+            (sid,)).fetchone())
         return item
 
     def subscription_by_target(self, target_type: str, target_key: str) -> dict | None:
@@ -1193,6 +1220,13 @@ class Database:
 
     def set_subscription_matched_count(self, sid: int, count: int) -> None:
         self.conn.execute("UPDATE subscriptions SET matched_count=? WHERE id=?", (count, sid))
+        self.conn.commit()
+
+    def update_subscription_progress(self, sid: int, run_id: int, matched: int) -> None:
+        """检查进行中增量写 matched_count（订阅 + 本轮跑），一次事务，供前端轮询看实时进度。"""
+        self.conn.execute(
+            "UPDATE subscriptions SET matched_count=?, updated_at=? WHERE id=?", (matched, _now(), sid))
+        self.conn.execute("UPDATE subscription_check_runs SET matched_count=? WHERE id=?", (matched, run_id))
         self.conn.commit()
 
     def get_subscription_candidate(self, cid: int) -> dict | None:
