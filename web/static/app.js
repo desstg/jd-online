@@ -755,7 +755,8 @@ function toast(msg) {
     '.card-sub[data-subscribe-target][data-target-type="movie"], ' +
     'button[data-subscribe-target][data-target-type="movie"], ' +
     'button[data-subscribe-target][data-target-type="list"], ' +
-    '.actor-sub-btn[data-subscribe-actor]'
+    '.actor-sub-btn[data-subscribe-actor], ' +
+    'button.sub-btn[data-subscribe-actor]'
   ));
   if (!buttons.length) return;
 

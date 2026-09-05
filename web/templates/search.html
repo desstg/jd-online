@@ -6,7 +6,7 @@
 <div class="search-head">
   <div class="search-title">{{ type_label }}：<span class="search-query">"{{ q }}"</span> <span class="rank-count">{{ count }}</span></div>
   {% if st == 'actor' and actor_id %}
-  <button class="sub-btn actor-sub-btn" type="button" data-subscribe-actor data-target-id="{{ actor_id }}" data-target-name="{{ actor_name | e }}">{{ icon('heart', 15) }}<span class="actor-sub-label">订阅</span></button>
+  <button class="sub-btn" type="button" data-subscribe-actor data-target-id="{{ actor_id }}" data-target-name="{{ actor_name | e }}">{{ icon('heart', 15) }}<span class="card-sub-label">订阅</span></button>
   {% elif st == 'actor' %}
   <button class="sub-btn" type="button" disabled title="无法识别该演员">{{ icon('heart', 15) }} 订阅</button>
   {% elif st == 'label' %}
