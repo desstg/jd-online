@@ -1412,28 +1412,32 @@ def create_app() -> Flask:
             start = (page - 1) * per
             movies = filtered[start:start + per]
 
-            # 演员搜索：解析目标演员 id（第一部影片详情的 actors），供搜索页「订阅」按钮创建演员订阅
-            if stype == "actor" and filtered:
-                try:
-                    mid = filtered[0].get("id")
-                    if mid:
+            # 演员搜索：解析目标演员 id（用原始搜索结果前几部影片详情的 actors），供搜索页「订阅」按钮
+            if stype == "actor":
+                src = all_items or filtered or []
+                for item in src[:3]:
+                    mid = item.get("id")
+                    if not mid:
+                        continue
+                    try:
                         detail = build_client(cfg).movie(mid)
-                        actors = ((detail.get("data") or {}).get("movie") or {}).get("actors") or []
-                        q_l = q.lower()
+                    except Exception:  # noqa: BLE001
+                        continue
+                    actors = ((detail.get("data") or {}).get("movie") or {}).get("actors") or []
+                    q_l = q.lower()
+                    match = next((a for a in actors
+                                  if (a.get("name") or "").strip().lower() == q_l), None)
+                    if match is None:
                         match = next((a for a in actors
-                                      if (a.get("name") or "").strip().lower() == q_l), None)
-                        if match is None:
-                            match = next((a for a in actors
-                                          if (a.get("name_zht") or "").strip().lower() == q_l), None)
-                        if match is None:
-                            match = next((a for a in actors
-                                          if q_l in (a.get("name") or "").lower()), None)
-                        match = match or (actors[0] if actors else None)
-                        if match:
-                            actor_id = match.get("id")
-                            actor_name = match.get("name_zht") or match.get("name") or q
-                except Exception:  # noqa: BLE001
-                    actor_id = None
+                                      if (a.get("name_zht") or "").strip().lower() == q_l), None)
+                    if match is None:
+                        match = next((a for a in actors
+                                      if q_l in (a.get("name") or "").lower()), None)
+                    match = match or (actors[0] if actors else None)
+                    if match:
+                        actor_id = match.get("id")
+                        actor_name = match.get("name_zht") or match.get("name") or q
+                        break
         except Exception as e:  # noqa: BLE001
             error = str(e)
 
