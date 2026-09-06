@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS push_queue (
     code       TEXT,
     status     TEXT NOT NULL DEFAULT 'pending',
     downloader TEXT,
+    error      TEXT,
     pushed_at  TEXT,
     created_at TEXT
 );
@@ -142,6 +143,17 @@ CREATE TABLE IF NOT EXISTS clouddrive2_config (
     password    TEXT DEFAULT '',
     save_path   TEXT DEFAULT '',
     enabled     INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS aria2_config (
+    id        INTEGER PRIMARY KEY CHECK (id = 1),
+    host      TEXT DEFAULT '192.168.31.4',
+    rpc_port  INTEGER DEFAULT 6801,
+    secret    TEXT DEFAULT '',
+    timeout   INTEGER DEFAULT 30,
+    https     INTEGER DEFAULT 0,
+    save_path TEXT DEFAULT '',
+    enabled   INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS magnet_sources (
@@ -348,6 +360,7 @@ class Database:
         for stmt in ("ALTER TABLE movies ADD COLUMN javbus_cover TEXT",
                      "ALTER TABLE movies ADD COLUMN last_viewed_at TEXT",
                      "ALTER TABLE push_queue ADD COLUMN downloader TEXT",
+                     "ALTER TABLE push_queue ADD COLUMN error TEXT",
                      "ALTER TABLE subscriptions ADD COLUMN expiry_days INTEGER",
                      "ALTER TABLE subscriptions ADD COLUMN categories TEXT",
                      "ALTER TABLE subscriptions ADD COLUMN exclude_categories TEXT",
@@ -362,6 +375,9 @@ class Database:
                 self.conn.execute(stmt)
             except sqlite3.OperationalError:
                 pass
+        # 清理已移除的迅雷下载器（旧库残留的 xunlei_config 表与 downloader 行）
+        self.conn.execute("DROP TABLE IF EXISTS xunlei_config")
+        self.conn.execute("DELETE FROM downloader WHERE kind='xunlei'")
         # 质量表 CHECK 升级：允许 uncensored（旧表用 edited 表示破解），重建去掉旧 CHECK
         row = self.conn.execute(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='subscription_quality_options'"
@@ -387,12 +403,13 @@ class Database:
         if self.conn.execute("SELECT COUNT(*) FROM downloader").fetchone()[0] == 0:
             for i, (name, kind) in enumerate([
                     ("115网盘", "pan115"), ("qBittorrent", "qbittorrent"),
-                    ("Aria2", "aria2"), ("CloudDrive2", "clouddrive2"), ("迅雷", "xunlei")], start=1):
+                    ("Aria2", "aria2"), ("CloudDrive2", "clouddrive2")], start=1):
                 self.conn.execute(
                     "INSERT INTO downloader (name, kind, enabled, sort_order) VALUES (?,?,?,?)",
                     (name, kind, 1 if kind == "pan115" else 0, i))
         self.conn.execute("INSERT OR IGNORE INTO pan115_config (id) VALUES (1)")
         self.conn.execute("INSERT OR IGNORE INTO clouddrive2_config (id) VALUES (1)")
+        self.conn.execute("INSERT OR IGNORE INTO aria2_config (id) VALUES (1)")
 
     def close(self) -> None:
         self.conn.close()
@@ -648,8 +665,23 @@ class Database:
 
     def set_push_status(self, push_id: int, status: str) -> None:
         self.conn.execute(
-            "UPDATE push_queue SET status=?, pushed_at=? WHERE id=?",
+            "UPDATE push_queue SET status=?, pushed_at=?, error=NULL WHERE id=?",
             (status, _now() if status == "pushed" else None, push_id),
+        )
+        self.conn.commit()
+
+    def mark_push_failed(self, push_id: int, error: str | None) -> None:
+        self.conn.execute(
+            "UPDATE push_queue SET status='failed', error=? WHERE id=?", (error, push_id)
+        )
+        self.conn.commit()
+
+    def reset_push(self, push_id: int, downloader: str | None = None) -> None:
+        """把一条已有推送记录重置为待推送，供重推复用同一条记录（不新插、不改 created_at）。"""
+        self.conn.execute(
+            "UPDATE push_queue SET status='pending', error=NULL, "
+            "downloader=COALESCE(?, downloader) WHERE id=?",
+            (downloader, push_id),
         )
         self.conn.commit()
 
@@ -733,6 +765,30 @@ class Database:
                 enable_ed2k=excluded.enable_ed2k, api_token=excluded.api_token,
                 user_name=excluded.user_name, password=excluded.password,
                 save_path=excluded.save_path, enabled=excluded.enabled
+            """,
+            cfg,
+        )
+        self.conn.commit()
+
+    def get_aria2_config(self) -> dict:
+        row = self.conn.execute("SELECT * FROM aria2_config WHERE id=1").fetchone()
+        if row:
+            return dict(row)
+        return {"host": "192.168.31.4", "rpc_port": 6801, "secret": "",
+                "timeout": 30, "https": 0, "save_path": "", "enabled": 0}
+
+    def save_aria2_config(self, cfg: dict) -> None:
+        self.conn.execute(
+            """
+            INSERT INTO aria2_config (
+                id, host, rpc_port, secret, timeout, https, save_path, enabled
+            )
+            VALUES (1, :host, :rpc_port, :secret, :timeout, :https, :save_path, :enabled)
+            ON CONFLICT(id) DO UPDATE SET
+                host=excluded.host, rpc_port=excluded.rpc_port,
+                secret=excluded.secret, timeout=excluded.timeout,
+                https=excluded.https, save_path=excluded.save_path,
+                enabled=excluded.enabled
             """,
             cfg,
         )
@@ -995,6 +1051,15 @@ class Database:
         ).fetchall()
         return {r["actor_id"] for r in rows}
 
+    def movie_actor_names(self, movie_id: str) -> str:
+        """电影主演名（逗号分隔），用于 {actor_name} 等保存路径占位符。"""
+        rows = self.conn.execute(
+            "SELECT a.name FROM movie_actors ma JOIN actors a ON a.id=ma.actor_id "
+            "WHERE ma.movie_id=? AND a.name IS NOT NULL AND a.name != ''",
+            (movie_id,),
+        ).fetchall()
+        return "、".join(r["name"] for r in rows)
+
     # ---- subscriptions ----
     def create_subscription(self, data: dict, qualities: list[str]) -> int:
         now = _now()
@@ -1101,7 +1166,7 @@ class Database:
               (SELECT COUNT(*) FROM subscription_check_runs r WHERE r.subscription_id=s.id) AS run_count,
               (SELECT COUNT(*) FROM subscription_push_attempts p WHERE p.subscription_id=s.id AND p.status='succeeded') AS push_count
             FROM subscriptions s WHERE {where}
-            ORDER BY COALESCE(s.updated_at, s.created_at) DESC LIMIT ? OFFSET ?
+            ORDER BY s.created_at DESC, s.id DESC LIMIT ? OFFSET ?
             """,
             (limit, offset),
         ).fetchall()
@@ -1179,6 +1244,13 @@ class Database:
         return bool(cur.rowcount)
 
     def create_subscription_run(self, sid: int, trigger: str, matcher_version: str) -> int:
+        # 同一订阅开启新检查时，旧的遗留 running 轮次作废（同一订阅只允许一个“匹配中”）
+        self.conn.execute(
+            "UPDATE subscription_check_runs SET status='failed', "
+            "error_message='superseded by new run', completed_at=? "
+            "WHERE subscription_id=? AND status='running'",
+            (_now(), sid),
+        )
         cur = self.conn.execute(
             "INSERT INTO subscription_check_runs (subscription_id, trigger_type, status, matcher_version, started_at) "
             "VALUES (?, ?, 'running', ?, ?)",
@@ -1186,6 +1258,20 @@ class Database:
         )
         self.conn.commit()
         return int(cur.lastrowid)
+
+    def abort_orphaned_runs(self, note: str | None = None) -> int:
+        """把遗留的 running 检查轮次标记为 failed（进程重启后原 running 必为残留）。
+
+        例如检查中途重启/卡死，run_check 来不及 finish，DB 里就留下 running，
+        导致卡片永久显示“匹配中”。启动时调用一次即可清空所有残留。
+        """
+        cur = self.conn.execute(
+            "UPDATE subscription_check_runs SET status='failed', "
+            "error_message=COALESCE(?, error_message), completed_at=? WHERE status='running'",
+            (note, _now()),
+        )
+        self.conn.commit()
+        return cur.rowcount
 
     def finish_subscription_run(self, run_id: int, status: str, matched: int = 0,
                                 rejected: int = 0, error: str | None = None) -> None:

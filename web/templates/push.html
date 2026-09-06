@@ -20,7 +20,7 @@
         <td>{{ p['size'] or '—' }}</td>
         <td>
           {% if p['status'] == 'pushed' %}<span class="badge">已推送</span>
-          {% elif p['status'] == 'failed' %}<span class="badge" style="background:rgba(220,38,38,.1);color:#dc2626">失败</span>
+          {% elif p['status'] == 'failed' %}<span class="badge" style="background:rgba(220,38,38,.1);color:#dc2626">失败</span>{% if p['error'] %}<div class="rec-sub" style="font-size:0.72rem;color:#dc2626;margin-top:0.25rem;">{{ p['error'] }}</div>{% endif %}
           {% else %}<span class="badge" style="background:rgba(245,158,11,.1);color:#d97706">待推送</span>{% endif %}
         </td>
         <td>

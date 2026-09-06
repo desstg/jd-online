@@ -78,7 +78,6 @@
             </div>
             <div class="actor-name">{{ item.title }}</div>
             <div class="actor-meta">{{ item.type_label }} · 检 <span data-sub-count="{{ item.id }}">{{ item.matched_count or 0 }}</span> · 推 {{ item.push_count }}</div>
-            <div class="actor-foot">{{ icon('clock', 12) }} {{ item.date_str }}</div>
           </article>
           {% elif item.kind == 'list' %}
           <article class="want-card list-card" data-subscription-id="{{ item.id }}" data-movies-subscription="{{ item.id }}" data-movies-name="{{ item.target_name | e }}">
@@ -93,7 +92,6 @@
             <div class="list-logo">{{ item.list_logo or '清' }}</div>
             <div class="list-name">{{ item.title }}</div>
             <div class="list-meta"><span class="list-count">{{ icon('folder', 12) }} <span data-sub-count="{{ item.id }}">{{ item.matched_count or 0 }}</span></span></div>
-            <div class="list-foot">{{ icon('clock', 12) }} {{ item.date_str }}</div>
             <div class="list-tags">{% for q in item.qualities %}<span class="q-badge {{ q }}">{{ {'hd':'高清','uhd':'超清','subtitle':'字幕','uncensored':'破解'}[q] }}</span>{% endfor %}</div>
           </article>
           {% else %}

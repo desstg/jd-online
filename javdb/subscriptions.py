@@ -11,7 +11,7 @@ from datetime import date, datetime
 from typing import Callable
 
 from . import scrape
-from .db import Database
+from .db import Database, _now
 from .javbus import is_uncensored
 
 # 115 风控限制：同时提交到云盘的磁链不超过 2 个，避免一次推太多触发风控。
@@ -475,6 +475,12 @@ class SubscriptionCheckService:
             self.db.set_subscription_matched_count(subscription_id, matched)
             self.db.finish_subscription_run(run_id, "completed", matched, rejected)
             self.db.set_subscription_error(subscription_id, None)
+            # 检查后重算订阅状态：还有“订阅中”影片保持 active，全完才置 completed；
+            # 用户手动暂停的订阅在 refresh_status 内被保留，不被覆盖。
+            try:
+                self.refresh_status(subscription_id)
+            except Exception:  # noqa: BLE001
+                pass
             return {"run_id": run_id, "candidates": self.db.list_subscription_candidates(run_id),
                     "matched_count": matched, "rejected_count": rejected}
         except Exception as exc:
@@ -580,6 +586,9 @@ class SubscriptionCheckService:
         """
         subscription = self.db.get_subscription(subscription_id)
         if not subscription or subscription["target_type"] == "movie":
+            return
+        # 用户手动暂停的订阅保持 paused，不被影片状态重算覆盖（否则无法恢复）
+        if subscription.get("status") == "paused":
             return
         if subscription["target_type"] == "actor":
             statuses = self.actor_movie_statuses(subscription_id)

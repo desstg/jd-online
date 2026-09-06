@@ -142,7 +142,6 @@
         <a class="side-item side-sub" data-target="pan115">{{ icon('server', 15) }} 115 网盘</a>
         <a class="side-item side-sub" data-target="aria2">{{ icon('download', 15) }} Aria2</a>
         <a class="side-item side-sub" data-target="qb">{{ icon('download', 15) }} qBittorrent</a>
-        <a class="side-item side-sub" data-target="xunlei">{{ icon('download', 15) }} 迅雷</a>
       </div>
     </div>
     <div class="side-group" data-group="media">
@@ -448,9 +447,58 @@
       </div>
     </div>
 
-    <div class="panel" id="panel-aria2">{{ placeholder('Aria2 暂未接入。') }}</div>
+    <div class="panel" id="panel-aria2">
+      <div class="detail-section cd2-panel">
+        <div class="cd2-head">
+          <div class="section-title" style="margin-bottom:0;display:flex;align-items:center;gap:0.5rem;">
+            {{ icon('download', 18) }} <span>Aria2 配置</span>
+            <span class="badge cd2-hot">热更新</span>
+          </div>
+          <label class="switch-label cd2-enable">
+            <input type="checkbox" id="aria2-enabled" {{ 'checked' if aria2['enabled'] }} onchange="toggleAria2(this)"> <span id="aria2-enable-label">{{ '已启用' if aria2['enabled'] else '已禁用' }}</span>
+          </label>
+        </div>
+
+        <div class="cd2-grid">
+          <div class="cd2-field"><label>RPC 地址</label><input class="glass-input" id="aria2-host" value="{{ aria2.get('host','192.168.31.4') }}" placeholder="192.168.31.4"></div>
+          <div class="cd2-field"><label>RPC 端口</label><input class="glass-input" id="aria2-port" type="number" min="1" max="65535" value="{{ aria2.get('rpc_port',6801) }}" placeholder="6801"></div>
+          <div class="cd2-field"><label>超时时间(秒)</label><input class="glass-input" id="aria2-timeout" type="number" min="1" value="{{ aria2.get('timeout',30) }}" placeholder="30"></div>
+          <div class="cd2-field"><label>使用 HTTPS</label>
+            <select class="glass-input" id="aria2-https">
+              <option value="0" {{ 'selected' if not aria2['https'] }}>否</option>
+              <option value="1" {{ 'selected' if aria2['https'] }}>是</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="cd2-field" style="margin-bottom:1rem;"><label>RPC 密钥</label>
+          <input class="glass-input" id="aria2-secret" type="password" value="{{ aria2.get('secret','') }}" placeholder="aria2 RPC secret（无留空）" autocomplete="off">
+        </div>
+
+        <div class="cd2-field"><label>保存路径 <span title="下载文件保存到 aria2 的位置">ⓘ</span></label><input class="glass-input" id="aria2-save-path" value="{{ aria2.get('save_path','') }}" placeholder="/downloads/{actor_name}"></div>
+        <div class="form-hint cd2-var-hint">下载文件保存路径，支持变量：</div>
+        <div class="cd2-vars">
+          <span class="cd2-var">{release_date}</span> 发行日期、
+          <span class="cd2-var">{publish_date}</span> 推送日期、
+          <span class="cd2-var">{actor_name}</span> 演员名称、
+          <span class="cd2-var">{sub_name}</span> 综合订阅名称（系列/片商/发行商/导演/清单/前缀/关注的名称）。
+        </div>
+        <div class="form-hint" style="margin-top:0.4rem;">示例：<span class="cd2-var">/downloads/{actor_name}/{release_date}</span> 或 <span class="cd2-var">/downloads/{sub_name}/{release_date}</span></div>
+
+        <div class="cd2-test">
+          <button type="button" class="cd2-test-btn" id="aria2-test-btn" onclick="testAria2()" disabled>
+            <span class="cd2-test-icon">{{ icon('activity', 14) }}</span> 测试连接
+          </button>
+          <div class="cd2-test-msg" id="aria2-test-msg">请先启用 Aria2 后再进行测试</div>
+        </div>
+
+        <div class="cd2-foot">
+          <button type="button" class="glass-button ghost" onclick="reloadAria2()">{{ icon('refresh', 14) }} 重新加载</button>
+          <button type="button" class="glass-button" onclick="saveAria2()">{{ icon('save', 14) }} 保存配置</button>
+        </div>
+      </div>
+    </div>
     <div class="panel" id="panel-qb">{{ placeholder('qBittorrent 暂未接入。') }}</div>
-    <div class="panel" id="panel-xunlei">{{ placeholder('迅雷 暂未接入。') }}</div>
 
     <div class="panel" id="panel-mediaserver">
       <div class="detail-section">
@@ -1104,6 +1152,41 @@ async function saveClouddrive2() {
 }
 function reloadClouddrive2() { location.reload(); }
 syncCd2State();
+
+function aria2Body() {
+  return {
+    host: v('aria2-host'),
+    rpc_port: parseInt(v('aria2-port')) || 6801,
+    secret: v('aria2-secret'),
+    timeout: parseInt(v('aria2-timeout')) || 30,
+    https: v('aria2-https') === '1' ? 1 : 0,
+    save_path: v('aria2-save-path'),
+    enabled: document.getElementById('aria2-enabled').checked ? 1 : 0,
+  };
+}
+function syncAria2State() {
+  var on = document.getElementById('aria2-enabled').checked;
+  var btn = document.getElementById('aria2-test-btn');
+  var msg = document.getElementById('aria2-test-msg');
+  var lbl = document.getElementById('aria2-enable-label');
+  btn.disabled = !on;
+  msg.textContent = on ? '' : '请先启用 Aria2 后再进行测试';
+  msg.style.display = on ? 'none' : 'block';
+  lbl.textContent = on ? '已启用' : '已禁用';
+}
+function toggleAria2(el) { syncAria2State(); }
+async function testAria2() {
+  var body = aria2Body();
+  if (!body.host) { toast('请填写 RPC 地址'); return; }
+  try { var j = await jsonPost('/api/aria2/test', body); toast(j.ok ? ('连接成功：' + j.msg) : ('连接失败：' + (j.msg || ''))); }
+  catch (e) { toast('测试失败：' + e); }
+}
+async function saveAria2() {
+  try { var j = await jsonPost('/api/aria2/config', aria2Body()); toast(j.ok ? 'Aria2 配置已保存' : ('保存失败：' + (j.error || ''))); if (j.ok) setTimeout(function(){ location.reload(); }, 600); }
+  catch (e) { toast('保存失败：' + e); }
+}
+function reloadAria2() { location.reload(); }
+syncAria2State();
 
 // —— 订阅配置（18.png） ——
 function subTimes(kind) {

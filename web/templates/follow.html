@@ -31,7 +31,6 @@
         <div class="list-logo follow-logo">{{ (u['username'] or '分')[:1] }}</div>
         <div class="list-name follow-name">{{ u['username'] or '分享者' }}</div>
         <div class="list-meta"><span class="list-count">{{ icon('film', 12) }} {{ u['share_count'] or 0 }} 部</span></div>
-        <div class="list-foot">{{ icon('clock', 12) }} {{ (u['created_at'] or '')[:16].replace('T', ' ') }}</div>
       </article>
       {% endfor %}
       {% endif %}

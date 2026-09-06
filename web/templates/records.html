@@ -81,7 +81,7 @@
         <td>
           <div style="font-size:0.88rem;">{{ r['code'] or '—' }}</div>
           <div class="rec-sub">{{ r['name'] or r['movie_title'] or r['magnet'][:50] }}</div>
-          {% if r['status'] == 'failed' %}<div class="rec-err">{{ r['movie_title'] }}: 115网盘: 错误: 任务已存在</div>{% endif %}
+          {% if r['status'] == 'failed' %}<div class="rec-err">{{ r['error'] or '推送失败' }}</div>{% endif %}
         </td>
         <td>
           {% if r['hd'] %}<span class="badge">高清</span>{% endif %}
@@ -90,7 +90,12 @@
         <td class="rec-sub">{{ r['time'] }}</td>
         <td class="rec-sub">{{ r['downloader'] or '—' }}</td>
         <td>
-          <button class="icon-btn-del" title="删除记录" onclick="delRecord({{ r['id'] }})">{{ icon('trash', 15) }}</button>
+          <div style="display:flex;gap:0.4rem;justify-content:flex-end;">
+            {% if r['status'] != 'pushed' %}
+            <button class="icon-btn-del" title="重新推送" style="color:#dc2626;border-color:rgba(220,38,38,.4);" onclick="repushRecord({{ r['id'] }})">{{ icon('refresh', 15) }}</button>
+            {% endif %}
+            <button class="icon-btn-del" title="删除记录" onclick="delRecord({{ r['id'] }})">{{ icon('trash', 15) }}</button>
+          </div>
         </td>
       </tr>
       {% endfor %}
@@ -108,6 +113,15 @@
 
 {% block scripts %}
 <script>
+async function repushRecord(id) {
+  toast('正在重新推送…');
+  try {
+    const r = await fetch('/api/push/' + id + '/repush', {method: 'POST'});
+    const j = await r.json();
+    toast(j.ok ? ('重推成功：' + (j.msg || '')) : ('重推失败：' + (j.error || '')));
+    setTimeout(function(){ location.reload(); }, 400);
+  } catch (e) { toast('重推失败：' + e); }
+}
 async function delRecord(id) {
   if (!confirm('确认删除这条下载记录？')) return;
   try {

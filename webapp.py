@@ -21,7 +21,7 @@ from urllib.parse import quote, unquote, urlparse
 from flask import Flask, g, jsonify, make_response, redirect, render_template, request, session, url_for
 
 from javdb import config as cfgmod
-from javdb import clouddrive2, pan115, scrape, subscriptions, sync
+from javdb import aria2, clouddrive2, pan115, scrape, subscriptions, sync
 from javdb.client import JavdbClient
 from javdb.db import Database
 from javdb.http import make_opener
@@ -522,12 +522,18 @@ def build_javbus(cfg: dict) -> JavbusClient:
 # ---------------------------------------------------------------- 下载器类型接入注册表
 # 未来新增下载器：在此加一个 {kind: {ready, push}} 条目即可（ready=配置满足，push=真正推送）。
 # 手动推送时弹窗列出「优先启用 + ready」的下载器；再按 kind 走对应 push。
+def _task_already_exists(msg: str) -> bool:
+    """判断下载器返回的错误是否为「任务已存在/重复」——此时磁链其实已在下载器中，应视为成功。"""
+    m = (msg or "").lower()
+    return any(k in m for k in ("已存在", "已经存在", "already exists", "重复", "duplicate"))
+
+
 def _pan115_ready(db: Database) -> bool:
     c = db.get_pan115_config()
     return bool(c.get("enabled") and c.get("cookie") and c.get("target_cid"))
 
 
-def _pan115_push(db: Database, magnet: str) -> tuple[bool, str]:
+def _pan115_push(db: Database, magnet: str, ctx: dict | None = None) -> tuple[bool, str]:
     c = db.get_pan115_config()
     if not c.get("cookie"):
         return False, "未配置 115 Cookie"
@@ -537,6 +543,8 @@ def _pan115_push(db: Database, magnet: str) -> tuple[bool, str]:
         pan115.add_magnet(c["cookie"], magnet, c["target_cid"])
         return True, "已推送"
     except Exception as e:  # noqa: BLE001
+        if _task_already_exists(str(e)):
+            return True, "该磁链已在下载器中，无需重复推送"
         return False, f"推送失败: {e}"
 
 
@@ -546,7 +554,7 @@ def _cd2_ready(db: Database) -> bool:
     return bool(c.get("enabled") and c.get("host") and c.get("rpc_port") and has_auth)
 
 
-def _cd2_push(db: Database, magnet: str) -> tuple[bool, str]:
+def _cd2_push(db: Database, magnet: str, ctx: dict | None = None) -> tuple[bool, str]:
     c = db.get_clouddrive2_config()
     if not c.get("enabled"):
         return False, "CloudDrive2 未启用"
@@ -564,19 +572,87 @@ def _cd2_push(db: Database, magnet: str) -> tuple[bool, str]:
         clouddrive2.add_offline_files(c["host"], c["rpc_port"], magnet, target, token)
         return True, "已推送"
     except Exception as e:  # noqa: BLE001
+        if _task_already_exists(str(e)):
+            return True, "该磁链已在下载器中，无需重复推送"
+        return False, f"推送失败: {e}"
+
+
+def _movie_sub_name(db: Database, movie_id: str | None) -> str:
+    """「综合订阅名称」：系列/片商/发行商/导演 名，供 {sub_name} 占位符兜底。"""
+    mrow = db.get_movie(movie_id) if movie_id else None
+    if not mrow:
+        return ""
+    m = dict(mrow)
+    for key in ("series_name", "maker_name", "publisher_name", "director_name"):
+        val = (m.get(key) or "").strip()
+        if val:
+            return val
+    return m.get("number") or m.get("title") or ""
+
+
+def render_save_path(template: str, db: Database, movie_id: str | None,
+                     code: str | None = None) -> str:
+    """把保存路径模板里的 {release_date}/{publish_date}/{actor_name}/{sub_name}/{code}/{title}
+    替换成实际值；未识别的 {占位符} 置空并折叠多余分隔符。"""
+    import re
+    mrow = db.get_movie(movie_id) if movie_id else None
+    m = dict(mrow) if mrow else None
+    pub = datetime.now().strftime("%Y-%m-%d")
+    mapping = {
+        "release_date": (m.get("release_date") or "") if m else "",
+        "publish_date": pub,
+        "actor_name": db.movie_actor_names(movie_id) if movie_id else "",
+        "sub_name": _movie_sub_name(db, movie_id),
+        "code": (code or (m.get("number") if m else "") or ""),
+        "title": (m.get("title") if m else ""),
+    }
+    out = template or ""
+    for key, val in mapping.items():
+        out = out.replace("{" + key + "}", val)
+    out = re.sub(r"\{[^}]+\}", "", out)
+    # 折叠连续斜杠，保留开头绝对路径（/downloads/...），去掉末尾多余斜杠
+    out = re.sub(r"/+", "/", out)
+    out = out.rstrip("/")
+    return out
+
+
+def _aria2_ready(db: Database) -> bool:
+    c = db.get_aria2_config()
+    return bool(c.get("enabled") and c.get("host") and c.get("rpc_port"))
+
+
+def _aria2_push(db: Database, magnet: str, ctx: dict | None = None) -> tuple[bool, str]:
+    c = db.get_aria2_config()
+    if not c.get("enabled"):
+        return False, "Aria2 未启用"
+    ctx = ctx or {}
+    path = render_save_path(c.get("save_path") or "", db,
+                            ctx.get("movie_id"), ctx.get("code"))
+    try:
+        aria2.add_magnet(c["host"], c["rpc_port"], c.get("secret") or None, magnet,
+                         path=path, timeout=int(c.get("timeout") or 30),
+                         https=bool(c.get("https")))
+        return True, "已推送到 Aria2"
+    except Exception as e:  # noqa: BLE001
+        if _task_already_exists(str(e)):
+            return True, "该磁链已在 Aria2 中，无需重复推送"
         return False, f"推送失败: {e}"
 
 
 _DL_HANDLERS: dict = {
     "pan115": {"ready": _pan115_ready, "push": _pan115_push},
     "clouddrive2": {"ready": _cd2_ready, "push": _cd2_push},
+    "aria2": {"ready": _aria2_ready, "push": _aria2_push},
 }
 
 
 def _do_push(db: Database, magnet: str, name: str = "", size: str = "",
              movie_id: str | None = None, code: str = "",
-             downloader: str | None = None) -> tuple[bool, int, str]:
-    """把磁链推送到指定下载器（手动选择）或第一个可用的（自动）。返回 (ok, qid, 描述)。"""
+             downloader: str | None = None, push_id: int | None = None) -> tuple[bool, int, str]:
+    """把磁链推送到指定下载器（手动选择）或第一个可用的（自动）。返回 (ok, qid, 描述)。
+
+    push_id 传入时复用同一条记录（重推），只更新其状态/时间/错误，不新增记录。
+    """
     magnet = (magnet or "").strip()
     if not magnet:
         return False, 0, "缺少磁链"
@@ -589,25 +665,34 @@ def _do_push(db: Database, magnet: str, name: str = "", size: str = "",
         dl = _primary_downloader(db)
     if not dl:
         return False, 0, "没有启用的下载器，请先在设置里启用"
-    qid = db.add_push(magnet=magnet, name=name, size=size, movie_id=movie_id, code=code,
-                      downloader=dl["name"])
+    if push_id is not None:
+        qid = push_id
+        # 复用同一条记录：重置为待推送，不改 created_at（仅更新下载时间/状态/错误）
+        db.reset_push(push_id, dl["name"])
+    else:
+        qid = db.add_push(magnet=magnet, name=name, size=size, movie_id=movie_id, code=code,
+                          downloader=dl["name"])
     handler = _DL_HANDLERS.get(dl["kind"])
     if handler:
-        ok, msg = handler["push"](db, magnet)
+        ctx = {"movie_id": movie_id, "code": code, "name": name}
+        ok, msg = handler["push"](db, magnet, ctx)
         if ok:
             db.set_push_status(qid, "pushed")
             return True, qid, f"已推送到 {dl['name']}"
+        db.mark_push_failed(qid, msg)
         return False, qid, msg
     return True, qid, "已加入推送队列"
 
 
 def _primary_downloader(db: Database) -> dict | None:
-    """下载器优先级里「排第一且已启用」的下载器（未接入类型自动跳过）。
+    """下载器优先级里「排第一且已启用 + 已配置可用(ready)」的下载器。
 
-    供订阅「执行操作」类批量推送自动使用：不弹选项，直接取最前启用的那个。
+    供订阅「执行操作」/定时任务自动使用：不弹选项，直接取最前『已配好』的那个，
+    跳过只启用但没配置的（避免自动推送时挑中不可用的下载器而失败）。
     """
     for d in db.list_downloaders():
-        if d["enabled"] and d["kind"] in _DL_HANDLERS:
+        if d["enabled"] and d["kind"] in _DL_HANDLERS \
+                and _DL_HANDLERS[d["kind"]]["ready"](db):
             return d
     return None
 
@@ -881,6 +966,25 @@ def _completed_card(item: dict, db: Database) -> dict:
     return card
 
 
+def _recompute_sub_statuses(items: list, view: str, service) -> None:
+    """演员/清单订阅卡片状态：按影片命中情况重算（还有订阅中影片=active，否则=completed）。
+
+    供 HTML 渲染与 JS 轮询 API 共用，保证卡片状态与影片弹窗一致，
+    且不被后台遗留的 completed 误标。用户手动暂停的订阅保持 paused。
+    """
+    if view not in ("actors", "lists"):
+        return
+    for it in items:
+        try:
+            sts = (service.actor_movie_statuses(it["id"]) if view == "actors"
+                   else service.list_movie_statuses(it["id"]))
+        except Exception:  # noqa: BLE001
+            sts = []
+        # 用户手动暂停的订阅保持 paused，不被影片状态重算覆盖（否则无法恢复）
+        if sts and it.get("status") != "paused":
+            it["status"] = "active" if any(s["sub_status"] == "active" for s in sts) else "completed"
+
+
 def create_app() -> Flask:
     app = Flask(__name__, template_folder="web/templates", static_folder="web/static")
     cfg = cfgmod.load(CONFIG_PATH)
@@ -893,6 +997,13 @@ def create_app() -> Flask:
         if "db" not in g:
             g.db = Database(get_cfg().get("db_path", "javdb.db"))
         return g.db
+
+    # 启动时清掉被中断/遗留的“匹配中”检查轮次（进程重启后原 running 必为残留，
+    # 否则卡片会永久显示“匹配中”）
+    try:
+        Database(get_cfg().get("db_path", "javdb.db")).abort_orphaned_runs("server restarted")
+    except Exception:  # noqa: BLE001
+        pass
 
     @app.context_processor
     def _global_categories():
@@ -1254,6 +1365,7 @@ def create_app() -> Flask:
         return render_template("settings.html", cfg=cfg, servers=db.list_servers(),
                                api_nodes=cfgmod.API_NODES, pan115=db.get_pan115_config(),
                                clouddrive2=db.get_clouddrive2_config(),
+                               aria2=db.get_aria2_config(),
                                downloaders=db.list_downloaders(),
                                magnet_timeout=cfg.get("magnet_timeout", 30),
                                magnet_sources=db.list_magnet_sources(),
@@ -1533,15 +1645,7 @@ def create_app() -> Flask:
             # 演员/清单订阅：渲染时直接算卡片状态（还有“订阅中”影片则显示订阅中，不显示已完成）
             if view in ("actors", "lists"):
                 try:
-                    service = _subscription_services(db)
-                    for it in items:
-                        try:
-                            sts = (service.actor_movie_statuses(it["id"]) if view == "actors"
-                                   else service.list_movie_statuses(it["id"]))
-                        except Exception:  # noqa: BLE001
-                            sts = []
-                        if sts:
-                            it["status"] = "active" if any(s["sub_status"] == "active" for s in sts) else "completed"
+                    _recompute_sub_statuses(items, view, _subscription_services(db))
                 except Exception:  # noqa: BLE001
                     pass
         return render_template("want.html", views=views, view=view, counts=counts,
@@ -1639,8 +1743,15 @@ def create_app() -> Flask:
             return jsonify(ok=False, error="非法视图"), 400
         page = max(1, request.args.get("page", 1, type=int))
         page_size = min(100, max(1, request.args.get("page_size", 20, type=int)))
-        return jsonify(ok=True, items=db.list_subscriptions(
-            view, page_size, (page - 1) * page_size), total=db.count_subscriptions(view))
+        items = db.list_subscriptions(view, page_size, (page - 1) * page_size)
+        # 与 HTML 渲染保持一致：演员/清单订阅按影片命中情况重算状态（否则 JS 轮询会
+        # 用后台遗留的 completed 把“订阅中”卡片误标成已完成）
+        if view in ("actors", "lists"):
+            try:
+                _recompute_sub_statuses(items, view, _subscription_services(db))
+            except Exception:  # noqa: BLE001
+                pass
+        return jsonify(ok=True, items=items, total=db.count_subscriptions(view))
 
     @app.route("/api/want/subscriptions", methods=["POST"])
     def api_want_subscription_create():
@@ -2533,6 +2644,39 @@ def create_app() -> Flask:
         db.save_clouddrive2_config(cur)
         return jsonify(ok=True)
 
+    @app.route("/api/aria2/test", methods=["POST"])
+    def api_aria2_test():
+        db = get_db()
+        data = request.get_json(silent=True) or {}
+        cur = db.get_aria2_config()
+        host = (data.get("host") or "").strip() or cur.get("host") or "192.168.31.4"
+        port = int(data.get("rpc_port") or cur.get("rpc_port") or 6801)
+        timeout = int(data.get("timeout") or cur.get("timeout") or 30)
+        secret = (data.get("secret") or "").strip() or cur.get("secret") or ""
+        https = bool(data.get("https", cur.get("https", 0)))
+        try:
+            info = aria2.test_connection(host, port, secret or None, timeout=timeout, https=https)
+            return jsonify(ok=True, msg=f"连接成功（aria2 {info.get('version') or ''}）".rstrip())
+        except Exception as e:  # noqa: BLE001
+            return jsonify(ok=False, msg=str(e)), 400
+
+    @app.route("/api/aria2/config", methods=["POST"])
+    def api_aria2_config():
+        db = get_db()
+        data = request.get_json(silent=True) or {}
+        cur = db.get_aria2_config()
+        cur.update({
+            "host": data.get("host", cur.get("host", "192.168.31.4")).strip(),
+            "rpc_port": int(data.get("rpc_port", cur.get("rpc_port", 6801)) or 6801),
+            "secret": data.get("secret", cur.get("secret", "")).strip(),
+            "timeout": int(data.get("timeout", cur.get("timeout", 30)) or 30),
+            "https": 1 if data.get("https", cur.get("https", 0)) else 0,
+            "save_path": data.get("save_path", cur.get("save_path", "")).strip(),
+            "enabled": 1 if data.get("enabled", cur.get("enabled", 0)) else 0,
+        })
+        db.save_aria2_config(cur)
+        return jsonify(ok=True)
+
     @app.route("/api/downloader/toggle", methods=["POST"])
     def api_downloader_toggle():
         db = get_db()
@@ -2614,11 +2758,13 @@ def create_app() -> Flask:
         row = db.get_push(pid)
         if not row:
             return jsonify(ok=False, error="记录不存在"), 404
+        # 重推：复用同一条记录（不新增/不删除），且沿用这条记录原有的下载器
         ok, qid, msg = _do_push(db, row["magnet"], name=row["name"] or "",
                                 size=row["size"] or "", movie_id=row["movie_id"],
-                                code=row["code"] or "")
+                                code=row["code"] or "",
+                                downloader=row["downloader"] or None,
+                                push_id=pid)
         if ok:
-            db.delete_push(pid)
             return jsonify(ok=True, qid=qid, msg=msg)
         return jsonify(ok=False, qid=qid, error=msg), 400
 

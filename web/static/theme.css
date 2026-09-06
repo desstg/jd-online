@@ -800,15 +800,6 @@ textarea.glass-input { width: 100%; min-height: 4.5rem; resize: vertical; line-h
   background: var(--accent); color: #fff; font-size: 0.85rem; font-weight: 600;
   padding: 0.1rem 0.5rem; border-radius: 999px; align-self: center;
 }
-.rank-sub-btn {
-  display: inline-flex; align-items: center; gap: 0.4rem;
-  border: 1px solid var(--border); background: #fff; color: var(--text-main);
-  padding: 0.5rem 1rem; border-radius: 999px; font-size: 0.85rem; cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
-}
-.rank-sub-btn:hover { border-color: var(--accent); color: var(--accent); }
-.rank-sub-btn svg { width: 15px; height: 15px; }
-
 .rank-filters {
   display: flex; align-items: center; gap: 0.7rem; margin-bottom: 1.4rem;
   flex-wrap: nowrap; overflow-x: auto; padding-bottom: 3px; scrollbar-width: thin; -webkit-overflow-scrolling: touch;
@@ -882,7 +873,8 @@ textarea.glass-input { width: 100%; min-height: 4.5rem; resize: vertical; line-h
 @media (max-width:768px){ .actor-rank-grid{grid-template-columns:repeat(2,minmax(0,1fr));} }
 .actor-rank-card { position:relative; display:flex; flex-direction:column; align-items:center; gap:0.5rem;
   padding:1rem 0.8rem 0.9rem; background:#fff; border:1px solid var(--border); border-radius:12px;
-  color:inherit; text-decoration:none; transition:box-shadow 0.2s, transform 0.2s; }
+  color:inherit; text-decoration:none; transition:box-shadow 0.2s, transform 0.2s;
+  box-shadow:0 4px 12px rgba(0,0,0,0.10); }
 .actor-rank-card:hover { box-shadow:0 10px 24px rgba(0,0,0,0.12); transform:translateY(-2px); border-color:var(--accent); }
 .actor-rank-card .rank-num { left:10px; right:auto; }
 .actor-rank-card .actor-sub-btn { left:auto; right:8px; }
@@ -975,9 +967,17 @@ textarea.glass-input { width: 100%; min-height: 4.5rem; resize: vertical; line-h
   border-left:3px solid var(--accent);
 }
 
+/* 演员/清单/分享者卡：统一用榜单演员卡样式（圆角、均匀边框、去左强调条、加阴影） */
+.want-card.actor-card, .want-card.list-card, .want-card.follow-card {
+  border-radius:12px; border:1px solid var(--border); box-shadow:0 4px 12px rgba(0,0,0,0.10);
+}
+.want-card.actor-card:hover, .want-card.list-card:hover, .want-card.follow-card:hover {
+  box-shadow:0 10px 24px rgba(0,0,0,0.14); transform:translateY(-2px);
+}
+
 /* 清单订阅：字母徽标卡（参考 11.png） */
 .want-card.list-card { align-items:center; text-align:center; padding:1rem 0.8rem 0.9rem; gap:0.5rem; }
-.list-logo { width:64px; height:64px; border-radius:16px; display:flex; align-items:center; justify-content:center;
+.list-logo { width:88px; height:88px; border-radius:50%; display:flex; align-items:center; justify-content:center;
   font-family:var(--font-heading); font-weight:700; font-size:1.6rem; color:#fff;
   background:linear-gradient(135deg, #a855f7, #7c3aed); }
 .list-name { font-family:var(--font-heading); font-weight:600; font-size:0.95rem; color:var(--text-main);
@@ -990,7 +990,7 @@ textarea.glass-input { width: 100%; min-height: 4.5rem; resize: vertical; line-h
 
 /* 关注页：分享者卡片（复用清单卡片样式，参考 11.png） */
 .want-card.follow-card { cursor: pointer; }
-.want-card.follow-card:hover { border-color: var(--accent); box-shadow: 0 6px 20px rgba(0,0,0,0.12); transform: translateY(-1px); }
+.want-card.follow-card:hover { border-color: var(--accent); box-shadow: 0 10px 24px rgba(0,0,0,0.14); transform: translateY(-2px); }
 .follow-logo { background: linear-gradient(135deg, #38bdf8, #6366f1); }
 .follow-name { max-width: 100%; padding: 0 0.3rem; word-break: break-all; }
 .follow-card .want-card-actions .want-action-btn { width: 26px; height: 26px; }
